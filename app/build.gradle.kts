@@ -122,9 +122,6 @@ dependencies {
     // ── DataStore ──
     implementation(libs.datastore.preferences)
 
-    // ── Lottie Animations ──
-    implementation(libs.lottie.compose)
-
     // ── Splash Screen ──
     implementation(libs.androidx.splashscreen)
 
