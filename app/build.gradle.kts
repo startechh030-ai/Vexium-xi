@@ -41,10 +41,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // Fixed: removed .set() - using assignment instead
-    KotlinOptions {
-        jvmTarget = "17"
-    }
+    // ❌ REMOVE this block – it’s replaced by the kotlin {} block below
+    // kotlinOptions {
+    //     jvmTarget = "17"
+    // }
 
     buildFeatures {
         compose = true
@@ -55,6 +55,13 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+// ✅ NEW: Kotlin compiler options (required for Kotlin 2.0+)
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
