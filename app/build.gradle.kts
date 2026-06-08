@@ -41,8 +41,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Fixed: removed .set() - using assignment instead
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        jvmTarget = "17"
     }
 
     buildFeatures {
