@@ -42,7 +42,7 @@ android {
     }
 
     // Fixed: removed .set() - using assignment instead
-    compilerOptions {
+    KotlinOptions {
         jvmTarget = "17"
     }
 
