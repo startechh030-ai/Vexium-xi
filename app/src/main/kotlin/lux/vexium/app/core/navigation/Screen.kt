@@ -7,6 +7,9 @@ import kotlinx.serialization.Serializable
  */
 sealed interface Screen {
 
+    // ── Splash ──
+    @Serializable data object Splash : Screen
+
     // ── Bottom Nav Tabs ──
     @Serializable data object Home : Screen
     @Serializable data object Games : Screen

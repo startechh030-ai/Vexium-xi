@@ -124,6 +124,10 @@ dependencies {
 
     // ── Splash Screen ──
     implementation(libs.androidx.splashscreen)
+    
+    //——––Media player–––
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
 
     // ── Testing ──
     testImplementation(libs.junit)
