@@ -10,6 +10,11 @@ sealed interface Screen {
     // ── Splash ──
     @Serializable data object Splash : Screen
 
+    // ── Welcome / Auth ──
+    @Serializable data object Welcome : Screen
+    @Serializable data object Login : Screen
+    @Serializable data object Register : Screen
+
     // ── Bottom Nav Tabs ──
     @Serializable data object Home : Screen
     @Serializable data object Games : Screen
@@ -23,7 +28,6 @@ sealed interface Screen {
     // ── Wallet ──
     @Serializable data object Wallet : Screen
 
-    // ── Auth ──
-    @Serializable data object Login : Screen
-    @Serializable data object Register : Screen
+    // ── Settings ──
+    @Serializable data object Settings : Screen
 }

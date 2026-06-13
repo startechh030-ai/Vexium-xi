@@ -1,0 +1,92 @@
+<svg width="700" height="280" viewBox="0 0 700 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main gradient: refined silver-to-black with subtle warmth -->
+    <linearGradient id="vexiumGradient" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#F0F0F0" />
+      <stop offset="8%" stop-color="#DCDCDC" />
+      <stop offset="18%" stop-color="#C8C8C8" />
+      <stop offset="30%" stop-color="#A8A8A8" />
+      <stop offset="42%" stop-color="#808080" />
+      <stop offset="54%" stop-color="#4A4A4A" />
+      <stop offset="65%" stop-color="#1E1E1E" />
+      <stop offset="78%" stop-color="#080808" />
+      <stop offset="100%" stop-color="#000000" />
+    </linearGradient>
+
+    <!-- Brighter metallic shine overlay -->
+    <linearGradient id="metallicShine" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.75" />
+      <stop offset="12%" stop-color="#FFFFFF" stop-opacity="0.45" />
+      <stop offset="28%" stop-color="#FFFFFF" stop-opacity="0.15" />
+      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.03" />
+      <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0.00" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.20" />
+    </linearGradient>
+
+    <!-- Soft glow for depth -->
+    <linearGradient id="softGlow" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="objectBoundingBox">
+      <stop offset="85%" stop-color="#FFFFFF" stop-opacity="0" />
+      <stop offset="95%" stop-color="#FFFFFF" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.25" />
+    </linearGradient>
+
+    <!-- Subtle drop shadow filter -->
+    <filter id="depthShadow" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+
+    <!-- Subtle inner shadow-like effect -->
+    <filter id="innerDepth">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur" />
+      <feOffset dx="0" dy="1" result="offsetBlur" />
+      <feComposite in="SourceGraphic" in2="offsetBlur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Main Text with gradient and subtle shadow -->
+  <g filter="url(#depthShadow)">
+    <text 
+      x="350" 
+      y="170" 
+      font-family="'Inter', 'Segoe UI', Arial Black, Helvetica, sans-serif" 
+      font-size="196" 
+      font-weight="900" 
+      fill="url(#vexiumGradient)" 
+      text-anchor="middle" 
+      dominant-baseline="middle" 
+      letter-spacing="-6px"
+      paint-order="stroke fill">
+      Vexium
+    </text>
+  </g>
+
+  <!-- Metallic shine overlay -->
+  <text 
+    x="350" 
+    y="170" 
+    font-family="'Inter', 'Segoe UI', Arial Black, Helvetica, sans-serif" 
+    font-size="196" 
+    font-weight="900" 
+    fill="url(#metallicShine)" 
+    text-anchor="middle" 
+    dominant-baseline="middle" 
+    letter-spacing="-6px"
+    opacity="0.8">
+    Vexium
+  </text>
+
+  <!-- Bottom edge glow for premium refinement -->
+  <text 
+    x="350" 
+    y="170" 
+    font-family="'Inter', 'Segoe UI', Arial Black, Helvetica, sans-serif" 
+    font-size="196" 
+    font-weight="900" 
+    fill="url(#softGlow)" 
+    text-anchor="middle" 
+    dominant-baseline="middle" 
+    letter-spacing="-6px">
+    Vexium
+  </text>
+
+</svg>

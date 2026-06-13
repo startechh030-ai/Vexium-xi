@@ -13,10 +13,16 @@ import lux.vexium.app.feature.games.presentation.GamesScreen
 import lux.vexium.app.feature.home.presentation.HomeScreen
 import lux.vexium.app.feature.nft.presentation.NftScreen
 import lux.vexium.app.feature.profile.presentation.ProfileScreen
+import lux.vexium.app.feature.settings.presentation.GeneralSettingsScreen
+import lux.vexium.app.feature.settings.presentation.SettingsViewModel
+import lux.vexium.app.feature.splash.presentation.SplashScreen
 import lux.vexium.app.feature.trade.presentation.TradeScreen
+import lux.vexium.app.feature.welcome.presentation.WelcomeScreen
 
 @Composable
-fun VexiumNavHost() {
+fun VexiumNavHost(
+    settingsViewModel: SettingsViewModel,
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
 
@@ -30,7 +36,7 @@ fun VexiumNavHost() {
         else -> null
     }
 
-    // Only show bottom bar on main tabs
+    // Show bottom bar only on main tabs
     val showBottomBar = currentRoute != null
 
     Scaffold(
@@ -40,7 +46,6 @@ fun VexiumNavHost() {
                     currentRoute = currentRoute,
                     onNavigate = { screen ->
                         navController.navigate(screen) {
-                            // Pop up to the start destination to avoid building up a large stack
                             popUpTo(Screen.Home) {
                                 saveState = true
                             }
@@ -54,9 +59,34 @@ fun VexiumNavHost() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home,
+            startDestination = Screen.Splash,
             modifier = Modifier.padding(innerPadding),
         ) {
+            // ── Splash ──
+            composable<Screen.Splash> {
+                SplashScreen(
+                    onSplashFinished = {
+                        navController.navigate(Screen.Welcome) {
+                            popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            // ── Welcome / Auth ──
+            composable<Screen.Welcome> {
+                WelcomeScreen(
+                    onGoogleClick = { /* TODO: Google sign in */ },
+                    onTelegramClick = { /* TODO: Telegram auth */ },
+                    onEmailClick = { /* TODO: Email auth */ },
+                    onGuestClick = {
+                        navController.navigate(Screen.Home) {
+                            popUpTo(Screen.Welcome) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
             // ── Main Tabs ──
             composable<Screen.Home> {
                 HomeScreen(
@@ -85,15 +115,13 @@ fun VexiumNavHost() {
                 ProfileScreen()
             }
 
-            // ── Detail Screens (add as you build) ──
-            // composable<Screen.GameDetail> { backStackEntry ->
-            //     val gameDetail = backStackEntry.toRoute<Screen.GameDetail>()
-            //     GameDetailScreen(gameId = gameDetail.gameId)
-            // }
-            //
-            // composable<Screen.Wallet> {
-            //     WalletScreen()
-            // }
+            // ── Settings ──
+            composable<Screen.Settings> {
+                GeneralSettingsScreen(
+                    settingsViewModel = settingsViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
         }
     }
 }

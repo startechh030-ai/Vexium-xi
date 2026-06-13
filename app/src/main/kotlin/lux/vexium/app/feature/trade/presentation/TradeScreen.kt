@@ -25,12 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import lux.vexium.app.core.theme.DarkCard
-import lux.vexium.app.core.theme.DarkNavy
-import lux.vexium.app.core.theme.NeonCyan
-import lux.vexium.app.core.theme.NeonGreen
-import lux.vexium.app.core.theme.NeonRed
-import lux.vexium.app.core.theme.TextSecondary
 
 data class TokenData(
     val symbol: String,
@@ -50,10 +44,12 @@ private val sampleTokens = listOf(
 
 @Composable
 fun TradeScreen() {
+    val colorScheme = MaterialTheme.colorScheme
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkNavy)
+            .background(colorScheme.background)
             .padding(horizontal = 20.dp),
     ) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -69,73 +65,71 @@ fun TradeScreen() {
         Text(
             text = "Buy, sell, and swap tokens",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
+            color = colorScheme.onSurfaceVariant,
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Token List ──
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(sampleTokens.size) { index ->
-                TokenCard(token = sampleTokens[index])
-            }
-        }
-    }
-}
-
-@Composable
-private fun TokenCard(token: TokenData) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Token icon placeholder
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(NeonCyan.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = token.symbol.take(2),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = NeonCyan,
-                )
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = token.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = token.symbol,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = token.price,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = token.change,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = if (token.isPositive) NeonGreen else NeonRed,
-                )
+                val token = sampleTokens[index]
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = colorScheme.surfaceContainerHigh,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(colorScheme.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = token.symbol.take(2),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = colorScheme.primary,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = token.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = token.symbol,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = token.price,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = token.change,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = if (token.isPositive) {
+                                    colorScheme.tertiary
+                                } else {
+                                    colorScheme.error
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
     }

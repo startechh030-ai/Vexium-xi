@@ -19,9 +19,6 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
-import lux.vexium.app.core.theme.DarkNavy
-import lux.vexium.app.core.theme.NeonCyan
-import lux.vexium.app.core.theme.TextSecondary
 
 data class BottomNavItem(
     val label: String,
@@ -44,8 +41,8 @@ fun VexiumBottomBar(
     onNavigate: (Screen) -> Unit,
 ) {
     NavigationBar(
-        containerColor = DarkNavy,
-        contentColor = NeonCyan,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
     ) {
         bottomNavItems.forEach { item ->
             val isSelected = currentRoute == item.route
@@ -65,11 +62,11 @@ fun VexiumBottomBar(
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = NeonCyan,
-                    selectedTextColor = NeonCyan,
-                    unselectedIconColor = TextSecondary,
-                    unselectedTextColor = TextSecondary,
-                    indicatorColor = NeonCyan.copy(alpha = 0.12f),
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 ),
             )
         }

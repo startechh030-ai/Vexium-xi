@@ -33,24 +33,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import lux.vexium.app.core.theme.DarkCard
-import lux.vexium.app.core.theme.DarkNavy
-import lux.vexium.app.core.theme.NeonCyan
-import lux.vexium.app.core.theme.NeonGreen
-import lux.vexium.app.core.theme.NeonOrange
-import lux.vexium.app.core.theme.NeonPurple
-import lux.vexium.app.core.theme.NeonRed
-import lux.vexium.app.core.theme.TextSecondary
 
 @Composable
 fun ProfileScreen() {
+    val colorScheme = MaterialTheme.colorScheme
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkNavy)
+            .background(colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
@@ -68,30 +63,29 @@ fun ProfileScreen() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            colors = CardDefaults.cardColors(
+                containerColor = colorScheme.surfaceContainerHigh,
+            ),
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(NeonCyan.copy(alpha = 0.2f)),
+                        .background(colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "P",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = NeonCyan,
+                        color = colorScheme.primary,
                     )
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
-
                 Text(
                     text = "Player",
                     style = MaterialTheme.typography.titleLarge,
@@ -100,14 +94,14 @@ fun ProfileScreen() {
                 Text(
                     text = "Level 1 • Beginner",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
+                    color = colorScheme.onSurfaceVariant,
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Stats Grid ──
+        // ── Stats ──
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -117,44 +111,47 @@ fun ProfileScreen() {
                 icon = Icons.Default.SportsEsports,
                 value = "0",
                 label = "Games",
-                color = NeonCyan,
+                color = colorScheme.primary,
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.EmojiEvents,
                 value = "0",
                 label = "Wins",
-                color = NeonGreen,
+                color = colorScheme.tertiary,
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.Star,
                 value = "0",
                 label = "XP",
-                color = NeonOrange,
+                color = colorScheme.secondary,
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ── Menu Items ──
+        // ── Menu ──
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            colors = CardDefaults.cardColors(
+                containerColor = colorScheme.surfaceContainerHigh,
+            ),
         ) {
             Column {
                 ProfileMenuItem(
                     icon = Icons.Default.Settings,
                     label = "Settings",
-                    onClick = { /* TODO */ },
+                    color = colorScheme.primary,
+                    onClick = { },
                 )
-                HorizontalDivider(color = DarkNavy)
+                HorizontalDivider(color = colorScheme.outlineVariant)
                 ProfileMenuItem(
                     icon = Icons.AutoMirrored.Filled.ExitToApp,
                     label = "Log Out",
-                    color = NeonRed,
-                    onClick = { /* TODO */ },
+                    color = colorScheme.error,
+                    onClick = { },
                 )
             }
         }
@@ -169,12 +166,14 @@ private fun StatCard(
     icon: ImageVector,
     value: String,
     label: String,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
 ) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -196,7 +195,7 @@ private fun StatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -206,7 +205,7 @@ private fun StatCard(
 private fun ProfileMenuItem(
     icon: ImageVector,
     label: String,
-    color: androidx.compose.ui.graphics.Color = NeonCyan,
+    color: Color,
     onClick: () -> Unit,
 ) {
     TextButton(

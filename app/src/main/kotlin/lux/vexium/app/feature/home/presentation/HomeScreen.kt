@@ -32,25 +32,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import lux.vexium.app.core.theme.DarkCard
-import lux.vexium.app.core.theme.DarkNavy
-import lux.vexium.app.core.theme.NeonCyan
-import lux.vexium.app.core.theme.NeonGreen
-import lux.vexium.app.core.theme.NeonPurple
-import lux.vexium.app.core.theme.TextSecondary
 
 @Composable
 fun HomeScreen(
     onNavigateToGames: () -> Unit = {},
     onNavigateToWallet: () -> Unit = {},
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkNavy)
+            .background(colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
@@ -66,20 +63,20 @@ fun HomeScreen(
                 Text(
                     text = "Welcome back 👋",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
+                    color = colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "Player",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = NeonCyan,
+                    color = colorScheme.primary,
                 )
             }
-            IconButton(onClick = { /* TODO: Notifications */ }) {
+            IconButton(onClick = { }) {
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = "Notifications",
-                    tint = TextSecondary,
+                    tint = colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -90,7 +87,9 @@ fun HomeScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            colors = CardDefaults.cardColors(
+                containerColor = colorScheme.surfaceContainerHigh,
+            ),
         ) {
             Box(
                 modifier = Modifier
@@ -98,9 +97,9 @@ fun HomeScreen(
                     .background(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
-                                NeonCyan.copy(alpha = 0.1f),
-                                NeonPurple.copy(alpha = 0.1f),
-                            )
+                                colorScheme.primary.copy(alpha = 0.08f),
+                                colorScheme.secondary.copy(alpha = 0.08f),
+                            ),
                         ),
                         shape = RoundedCornerShape(20.dp),
                     )
@@ -110,20 +109,20 @@ fun HomeScreen(
                     Text(
                         text = "Total Balance",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary,
+                        color = colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "$0.00",
                         style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
-                        color = NeonCyan,
+                        color = colorScheme.primary,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "▲ +0.00% today",
                         style = MaterialTheme.typography.bodySmall,
-                        color = NeonGreen,
+                        color = colorScheme.tertiary,
                     )
                 }
             }
@@ -146,26 +145,26 @@ fun HomeScreen(
             QuickActionButton(
                 icon = Icons.Default.SportsEsports,
                 label = "Play",
-                color = NeonCyan,
+                color = colorScheme.primary,
                 onClick = onNavigateToGames,
             )
             QuickActionButton(
                 icon = Icons.Default.AccountBalanceWallet,
                 label = "Wallet",
-                color = NeonPurple,
+                color = colorScheme.secondary,
                 onClick = onNavigateToWallet,
             )
             QuickActionButton(
                 icon = Icons.Default.TrendingUp,
                 label = "Trade",
-                color = NeonGreen,
-                onClick = { /* TODO */ },
+                color = colorScheme.tertiary,
+                onClick = { },
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ── Featured Games Section ──
+        // ── Featured Games ──
         Text(
             text = "🔥 Featured Games",
             style = MaterialTheme.typography.titleMedium,
@@ -173,14 +172,18 @@ fun HomeScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Placeholder cards
+        val gameColors = listOf(colorScheme.primary, colorScheme.secondary, colorScheme.tertiary)
+        val gameNames = listOf("Crypto Trivia", "Memory Match", "Tap Frenzy")
+
         repeat(3) { index ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 6.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkCard),
+                colors = CardDefaults.cardColors(
+                    containerColor = colorScheme.surfaceContainerHigh,
+                ),
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -190,34 +193,32 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                listOf(NeonCyan, NeonPurple, NeonGreen)[index].copy(alpha = 0.2f)
-                            ),
+                            .background(gameColors[index].copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Default.SportsEsports,
                             contentDescription = null,
-                            tint = listOf(NeonCyan, NeonPurple, NeonGreen)[index],
+                            tint = gameColors[index],
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = listOf("Crypto Trivia", "Memory Match", "Tap Frenzy")[index],
+                            text = gameNames[index],
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = "Earn rewards • Skill-based",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary,
+                            color = colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(
                         text = "Play →",
                         style = MaterialTheme.typography.labelLarge,
-                        color = NeonCyan,
+                        color = colorScheme.primary,
                     )
                 }
             }
@@ -231,12 +232,10 @@ fun HomeScreen(
 private fun QuickActionButton(
     icon: ImageVector,
     label: String,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
     onClick: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(
             onClick = onClick,
             modifier = Modifier
@@ -255,7 +254,7 @@ private fun QuickActionButton(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
