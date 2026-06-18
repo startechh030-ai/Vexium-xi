@@ -111,9 +111,10 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
 
-    // ── Image Loading ──
+        // ── Image Loading ──
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.svg)
 
     // ── Coroutines ──
     implementation(libs.kotlinx.coroutines.android)
