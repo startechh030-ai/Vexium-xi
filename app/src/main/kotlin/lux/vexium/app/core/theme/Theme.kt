@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// ── Dark Color Scheme ──
 private val VexiumDarkScheme = darkColorScheme(
     primary = DarkPrimary,
     onPrimary = DarkOnPrimary,
@@ -28,7 +27,7 @@ private val VexiumDarkScheme = darkColorScheme(
     onTertiaryContainer = DarkOnTertiaryContainer,
     error = DarkError,
     onError = DarkOnError,
-    errorContainer = Color(0xFF93000A),
+    errorContainer = Color(0xFF400008),
     onErrorContainer = Color(0xFFFFDAD6),
     background = DarkBackground,
     onBackground = DarkOnBackground,
@@ -41,16 +40,15 @@ private val VexiumDarkScheme = darkColorScheme(
     inverseSurface = DarkInverseSurface,
     inverseOnSurface = DarkInverseOnSurface,
     inversePrimary = DarkInversePrimary,
-    surfaceDim = DarkBackground,
+    surfaceDim = Color(0xFF000000),
     surfaceBright = DarkSurfaceVariant,
-    surfaceContainerLowest = Color(0xFF030306),
-    surfaceContainerLow = Color(0xFF0B0D14),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF080808),
     surfaceContainer = DarkSurfaceContainer,
     surfaceContainerHigh = DarkSurfaceContainerHigh,
     surfaceContainerHighest = DarkSurfaceContainerHighest,
 )
 
-// ── Light Color Scheme ──
 private val VexiumLightScheme = lightColorScheme(
     primary = LightPrimary,
     onPrimary = LightOnPrimary,
@@ -88,11 +86,6 @@ private val VexiumLightScheme = lightColorScheme(
     surfaceContainerHighest = LightSurfaceContainerHighest,
 )
 
-/**
- * Vexium app theme with light/dark support.
- *
- * @param themeMode Override theme mode. null = follow system.
- */
 @Composable
 fun VexiumTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -110,8 +103,8 @@ fun VexiumTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
-            window.navigationBarColor = colorScheme.background.toArgb()
+            window.statusBarColor = Color.Transparent.toArgb()
+            window.navigationBarColor = Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !isDark
                 isAppearanceLightNavigationBars = !isDark
@@ -126,7 +119,6 @@ fun VexiumTheme(
     )
 }
 
-/** Theme mode options */
 enum class ThemeMode {
     SYSTEM,
     LIGHT,

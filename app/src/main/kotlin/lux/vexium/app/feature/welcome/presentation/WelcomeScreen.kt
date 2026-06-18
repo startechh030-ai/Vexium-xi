@@ -1,7 +1,15 @@
 package lux.vexium.app.feature.welcome.presentation
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,29 +23,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import lux.vexium.app.R
 import lux.vexium.app.core.components.VexiumLogo
-import lux.vexium.app.core.theme.GoogleBlue
-import lux.vexium.app.core.theme.GoogleGreen
-import lux.vexium.app.core.theme.GoogleRed
-import lux.vexium.app.core.theme.GoogleYellow
-import lux.vexium.app.core.theme.TelegramBlue
 
 @Composable
 fun WelcomeScreen(
@@ -48,322 +52,251 @@ fun WelcomeScreen(
 ) {
     val isDark = isSystemInDarkTheme()
 
+    // Subtle ambient breathing animation
+    val infiniteTransition = rememberInfiniteTransition(label = "ambient")
+    val ambientPulse by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse",
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                if (isDark) {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF050508),
-                            Color(0xFF080A10),
-                            Color(0xFF050508),
-                        ),
-                    )
-                } else {
-                    // Light: subtle blue-tinted atmosphere
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFFF8FAFB),
-                            Color(0xFFF0F6FA),
-                            Color(0xFFE8F0F6),
-                            Color(0xFFF0F6FA),
-                            Color(0xFFF8FAFB),
-                        ),
-                    )
-                },
-            ),
+            .background(if (isDark) Color.Black else Color(0xFFF4F7FA)),
     ) {
-        // ── Background globe/sphere glow ──
+        // ── Ambient background glow ──
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawGlobe(isDark = isDark)
+            val w = size.width
+            val h = size.height
+
+            if (isDark) {
+                // Dark: very subtle blue ambient glow top-center
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF1A3A5C).copy(alpha = 0.12f * ambientPulse),
+                            Color(0xFF0D1F33).copy(alpha = 0.06f * ambientPulse),
+                            Color.Transparent,
+                        ),
+                        center = Offset(w / 2f, h * 0.28f),
+                        radius = w * 0.7f,
+                    ),
+                    radius = w * 0.7f,
+                    center = Offset(w / 2f, h * 0.28f),
+                )
+                // Subtle warm bottom glow
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF1A1A1A).copy(alpha = 0.4f),
+                            Color.Transparent,
+                        ),
+                        center = Offset(w / 2f, h * 0.75f),
+                        radius = w * 0.5f,
+                    ),
+                    radius = w * 0.5f,
+                    center = Offset(w / 2f, h * 0.75f),
+                )
+            } else {
+                // Light: soft icy blue orb behind logo area
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFD6ECFA).copy(alpha = 0.70f * ambientPulse),
+                            Color(0xFFE4F2FC).copy(alpha = 0.35f * ambientPulse),
+                            Color.Transparent,
+                        ),
+                        center = Offset(w / 2f, h * 0.32f),
+                        radius = w * 0.55f,
+                    ),
+                    radius = w * 0.55f,
+                    center = Offset(w / 2f, h * 0.32f),
+                )
+                // Subtle warm bottom glow
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFEFF4F8).copy(alpha = 0.50f),
+                            Color.Transparent,
+                        ),
+                        center = Offset(w / 2f, h * 0.72f),
+                        radius = w * 0.45f,
+                    ),
+                    radius = w * 0.45f,
+                    center = Offset(w / 2f, h * 0.72f),
+                )
+            }
         }
 
-        // ── Content ──
+        // ── Main Content ──
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp),
+                .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.weight(0.9f))
+            Spacer(modifier = Modifier.weight(0.8f))
 
-            // ── Vexium Logo ──
+            // ── Logo ──
             VexiumLogo(isDark = isDark)
 
-            Spacer(modifier = Modifier.weight(1.4f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Tagline ──
+            Text(
+                text = "Play. Earn. Trade.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isDark) Color.White.copy(alpha = 0.4f) else Color(0xFF6B7C8E),
+                fontWeight = FontWeight.Normal,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.weight(1.2f))
 
             // ── Auth Buttons ──
-            WelcomeButton(
-                text = "Continue With Google",
-                icon = { GoogleIcon() },
+            AuthButton(
+                iconRes = R.drawable.ic_google,
+                text = "Continue with Google",
                 isDark = isDark,
                 onClick = onGoogleClick,
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            WelcomeButton(
-                text = "Continue With Telegram",
-                icon = { TelegramIcon() },
+            AuthButton(
+                iconRes = R.drawable.ic_telegram,
+                text = "Continue with Telegram",
                 isDark = isDark,
                 onClick = onTelegramClick,
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            WelcomeButton(
-                text = "Continue With Email",
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Email,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF5F6368),
-                    )
-                },
+            AuthButton(
+                iconRes = R.drawable.ic_email,
+                text = "Continue with Email",
                 isDark = isDark,
                 onClick = onEmailClick,
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Try as Guest
-            TextButton(onClick = onGuestClick) {
+            // ── Divider with "or" ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(0.5.dp)
+                        .background(
+                            if (isDark) Color.White.copy(alpha = 0.08f)
+                            else Color.Black.copy(alpha = 0.08f)
+                        ),
+                )
+                Text(
+                    text = "or",
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isDark) Color.White.copy(alpha = 0.3f) else Color(0xFF999999),
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(0.5.dp)
+                        .background(
+                            if (isDark) Color.White.copy(alpha = 0.08f)
+                            else Color.Black.copy(alpha = 0.08f)
+                        ),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Guest Button ──
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onGuestClick)
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
                     text = "Try as Guest",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = if (isDark) {
-                        Color.White.copy(alpha = 0.5f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                    },
+                    color = if (isDark) Color.White.copy(alpha = 0.45f) else Color(0xFF2A6FAC),
                 )
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // ── Footer ──
+            Text(
+                text = "By continuing, you agree to our Terms & Privacy Policy",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isDark) Color.White.copy(alpha = 0.18f) else Color(0xFFAAAAAA),
+                textAlign = TextAlign.Center,
+                lineHeight = 16.sp,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 // ══════════════════════════════════════
-//  WELCOME BUTTON
+//  AUTH BUTTON
 // ══════════════════════════════════════
 @Composable
-private fun WelcomeButton(
+private fun AuthButton(
+    iconRes: Int,
     text: String,
-    icon: @Composable () -> Unit,
     isDark: Boolean,
     onClick: () -> Unit,
 ) {
-    Button(
-        onClick = onClick,
+    val shape = RoundedCornerShape(14.dp)
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isDark) {
-                Color.White.copy(alpha = 0.06f)
-            } else {
-                Color.White.copy(alpha = 0.85f)
-            },
-            contentColor = if (isDark) {
-                Color.White.copy(alpha = 0.85f)
-            } else {
-                Color(0xFF1A1C1E)
-            },
-        ),
-        border = ButtonDefaults.outlinedButtonBorder.copy(
-            width = if (isDark) 0.8.dp else 1.dp,
-            brush = Brush.linearGradient(
-                colors = if (isDark) {
-                    listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.05f))
+            .height(52.dp)
+            .clip(shape)
+            .then(
+                if (isDark) {
+                    Modifier
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .border(0.5.dp, Color.White.copy(alpha = 0.08f), shape)
                 } else {
-                    listOf(Color(0xFFD0D5DC), Color(0xFFE0E4E8))
-                },
-            ),
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = if (isDark) 0.dp else 1.dp,
-        ),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            icon()
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
+                    Modifier
+                        .background(Color.White)
+                        .border(1.dp, Color(0xFFE4E8EC), shape)
+                }
             )
-        }
-    }
-}
-
-// ══════════════════════════════════════
-//  GLOBE / SPHERE GLOW EFFECT
-// ══════════════════════════════════════
-private fun DrawScope.drawGlobe(isDark: Boolean) {
-    val w = size.width
-    val h = size.height
-
-    // Globe center — between logo and buttons area
-    val cx = w / 2f
-    val cy = h * 0.58f
-    val radius = w * 0.65f
-
-    if (isDark) {
-        // Dark: subtle warm white dome glow
-
-        // Very soft outer haze
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.025f),
-                    Color.White.copy(alpha = 0.01f),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy),
-                radius = radius * 1.2f,
-            ),
-            radius = radius * 1.2f,
-            center = Offset(cx, cy),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = Color.Unspecified, // preserve original icon colors
         )
-
-        // Bright crescent at top of the sphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.08f),
-                    Color.White.copy(alpha = 0.03f),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy - radius * 0.35f),
-                radius = radius * 0.5f,
-            ),
-            radius = radius * 0.5f,
-            center = Offset(cx, cy - radius * 0.35f),
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = if (isDark) Color.White.copy(alpha = 0.85f) else Color(0xFF1A1A1A),
         )
-
-        // Tight top highlight
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.10f),
-                    Color.White.copy(alpha = 0.03f),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy - radius * 0.50f),
-                radius = radius * 0.28f,
-            ),
-            radius = radius * 0.28f,
-            center = Offset(cx, cy - radius * 0.50f),
-        )
-    } else {
-        // Light: soft blue atmospheric globe (like the mockup)
-
-        // Large outer atmosphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFFCCE8F8).copy(alpha = 0.40f),
-                    Color(0xFFDCEFF8).copy(alpha = 0.20f),
-                    Color(0xFFF0F6FA).copy(alpha = 0.05f),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy),
-                radius = radius * 1.1f,
-            ),
-            radius = radius * 1.1f,
-            center = Offset(cx, cy),
-        )
-
-        // Inner brighter core
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFFB8E0F4).copy(alpha = 0.35f),
-                    Color(0xFFCCE8F8).copy(alpha = 0.15f),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy - radius * 0.20f),
-                radius = radius * 0.55f,
-            ),
-            radius = radius * 0.55f,
-            center = Offset(cx, cy - radius * 0.20f),
-        )
-
-        // Top crescent highlight
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.50f),
-                    Color(0xFFDCEFF8).copy(alpha = 0.18f),
-                    Color.Transparent,
-                ),
-                center = Offset(cx, cy - radius * 0.42f),
-                radius = radius * 0.25f,
-            ),
-            radius = radius * 0.25f,
-            center = Offset(cx, cy - radius * 0.42f),
-        )
-    }
-}
-
-// ══════════════════════════════════════
-//  GOOGLE ICON (multi-color G)
-// ══════════════════════════════════════
-@Composable
-private fun GoogleIcon() {
-    Canvas(modifier = Modifier.size(20.dp)) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val cy = h / 2f
-        val r = w * 0.42f
-        val s = androidx.compose.ui.geometry.Size(r * 2, r * 2)
-        val tl = Offset(cx - r, cy - r)
-
-        drawArc(color = GoogleRed, startAngle = -30f, sweepAngle = -120f, useCenter = true, topLeft = tl, size = s)
-        drawArc(color = GoogleYellow, startAngle = -150f, sweepAngle = -60f, useCenter = true, topLeft = tl, size = s)
-        drawArc(color = GoogleGreen, startAngle = -210f, sweepAngle = -60f, useCenter = true, topLeft = tl, size = s)
-        drawArc(color = GoogleBlue, startAngle = -270f, sweepAngle = -90f, useCenter = true, topLeft = tl, size = s)
-        drawCircle(color = Color.White, radius = r * 0.55f, center = Offset(cx, cy))
-        drawRect(color = GoogleBlue, topLeft = Offset(cx, cy - r * 0.15f), size = androidx.compose.ui.geometry.Size(r * 0.9f, r * 0.30f))
-    }
-}
-
-// ══════════════════════════════════════
-//  TELEGRAM ICON
-// ══════════════════════════════════════
-@Composable
-private fun TelegramIcon() {
-    Canvas(modifier = Modifier.size(20.dp)) {
-        val w = size.width
-        val h = size.height
-
-        drawCircle(color = TelegramBlue, radius = w / 2f, center = Offset(w / 2f, h / 2f))
-
-        val plane = androidx.compose.ui.graphics.Path().apply {
-            moveTo(w * 0.22f, h * 0.48f)
-            lineTo(w * 0.80f, h * 0.28f)
-            lineTo(w * 0.45f, h * 0.75f)
-            lineTo(w * 0.40f, h * 0.58f)
-            close()
-        }
-        drawPath(path = plane, color = Color.White)
-
-        val fold = androidx.compose.ui.graphics.Path().apply {
-            moveTo(w * 0.40f, h * 0.58f)
-            lineTo(w * 0.60f, h * 0.70f)
-            lineTo(w * 0.80f, h * 0.28f)
-            lineTo(w * 0.45f, h * 0.75f)
-            close()
-        }
-        drawPath(path = fold, color = Color.White.copy(alpha = 0.85f))
     }
 }

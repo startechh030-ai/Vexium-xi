@@ -3,114 +3,93 @@ package lux.vexium.app.core.theme
 import androidx.compose.ui.graphics.Color
 
 // ══════════════════════════════════════
-//  DARK THEME COLORS
+//  DARK THEME — True OLED Black
 // ══════════════════════════════════════
+val DarkPrimary = Color(0xFF5EB0EF)
+val DarkOnPrimary = Color(0xFF000000)
+val DarkPrimaryContainer = Color(0xFF1A3A5C)
+val DarkOnPrimaryContainer = Color(0xFFD0E8FF)
 
-// Primary
-val DarkPrimary = Color(0xFF00F5FF)          // Neon Cyan
-val DarkOnPrimary = Color(0xFF0A0E1A)
-val DarkPrimaryContainer = Color(0xFF00B8C4)
-val DarkOnPrimaryContainer = Color(0xFF66FAFF)
+val DarkSecondary = Color(0xFFA8B8CC)
+val DarkOnSecondary = Color(0xFF000000)
+val DarkSecondaryContainer = Color(0xFF1E2A38)
+val DarkOnSecondaryContainer = Color(0xFFD8E4F0)
 
-// Secondary
-val DarkSecondary = Color(0xFFBB86FC)        // Neon Purple
-val DarkOnSecondary = Color(0xFF0A0E1A)
-val DarkSecondaryContainer = Color(0xFF8858C8)
-val DarkOnSecondaryContainer = Color(0xFFD4AAFF)
+val DarkTertiary = Color(0xFF4ADE80)
+val DarkOnTertiary = Color(0xFF000000)
+val DarkTertiaryContainer = Color(0xFF0D3320)
+val DarkOnTertiaryContainer = Color(0xFFB8F5D9)
 
-// Tertiary
-val DarkTertiary = Color(0xFF00FF85)         // Neon Green
-val DarkOnTertiary = Color(0xFF0A0E1A)
-val DarkTertiaryContainer = Color(0xFF00C466)
-val DarkOnTertiaryContainer = Color(0xFF00FF85)
+val DarkBackground = Color(0xFF000000)          // OLED pure black
+val DarkOnBackground = Color(0xFFECECEC)
+val DarkSurface = Color(0xFF0C0C0C)
+val DarkOnSurface = Color(0xFFECECEC)
+val DarkSurfaceVariant = Color(0xFF161616)
+val DarkOnSurfaceVariant = Color(0xFF8E8E93)
+val DarkSurfaceContainer = Color(0xFF111111)
+val DarkSurfaceContainerHigh = Color(0xFF1A1A1A)
+val DarkSurfaceContainerHighest = Color(0xFF222222)
 
-// Background & Surface
-val DarkBackground = Color(0xFF050508)
-val DarkOnBackground = Color(0xFFE8EAED)
-val DarkSurface = Color(0xFF0F1118)
-val DarkOnSurface = Color(0xFFE8EAED)
-val DarkSurfaceVariant = Color(0xFF1A1D28)
-val DarkOnSurfaceVariant = Color(0xFF9CA3AF)
-val DarkSurfaceContainer = Color(0xFF141620)
-val DarkSurfaceContainerHigh = Color(0xFF1E2130)
-val DarkSurfaceContainerHighest = Color(0xFF252838)
+val DarkOutline = Color(0xFF333333)
+val DarkOutlineVariant = Color(0xFF222222)
 
-// Outline
-val DarkOutline = Color(0xFF3A3D4A)
-val DarkOutlineVariant = Color(0xFF2A2D38)
+val DarkError = Color(0xFFFF6B6B)
+val DarkOnError = Color(0xFF000000)
 
-// Error
-val DarkError = Color(0xFFEF4444)
-val DarkOnError = Color(0xFFFFFFFF)
-
-// Inverse
-val DarkInverseSurface = Color(0xFFE8EAED)
-val DarkInverseOnSurface = Color(0xFF0A0E1A)
-val DarkInversePrimary = Color(0xFF00B8C4)
+val DarkInverseSurface = Color(0xFFECECEC)
+val DarkInverseOnSurface = Color(0xFF000000)
+val DarkInversePrimary = Color(0xFF2A6FAC)
 
 // ══════════════════════════════════════
-//  LIGHT THEME COLORS
+//  LIGHT THEME — Ice White / Soft Blue
 // ══════════════════════════════════════
-
-// Primary
-val LightPrimary = Color(0xFF1A94E8)         // Vexium Blue
+val LightPrimary = Color(0xFF2A6FAC)
 val LightOnPrimary = Color(0xFFFFFFFF)
-val LightPrimaryContainer = Color(0xFFD4F0FF)
-val LightOnPrimaryContainer = Color(0xFF042D60)
+val LightPrimaryContainer = Color(0xFFD4ECFF)
+val LightOnPrimaryContainer = Color(0xFF0A2E50)
 
-// Secondary
-val LightSecondary = Color(0xFF6B50A8)
+val LightSecondary = Color(0xFF526070)
 val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFFE8DDFF)
-val LightOnSecondaryContainer = Color(0xFF2D1860)
+val LightSecondaryContainer = Color(0xFFE0E8F0)
+val LightOnSecondaryContainer = Color(0xFF1A2630)
 
-// Tertiary
-val LightTertiary = Color(0xFF00875A)
+val LightTertiary = Color(0xFF1A8A52)
 val LightOnTertiary = Color(0xFFFFFFFF)
-val LightTertiaryContainer = Color(0xFFB8F5D9)
-val LightOnTertiaryContainer = Color(0xFF002E1C)
+val LightTertiaryContainer = Color(0xFFBFF0D4)
+val LightOnTertiaryContainer = Color(0xFF003820)
 
-// Background & Surface
-val LightBackground = Color(0xFFF8FAFB)
-val LightOnBackground = Color(0xFF1A1C1E)
+val LightBackground = Color(0xFFF6F8FA)
+val LightOnBackground = Color(0xFF111111)
 val LightSurface = Color(0xFFFFFFFF)
-val LightOnSurface = Color(0xFF1A1C1E)
+val LightOnSurface = Color(0xFF111111)
 val LightSurfaceVariant = Color(0xFFF0F2F5)
-val LightOnSurfaceVariant = Color(0xFF5F6368)
-val LightSurfaceContainer = Color(0xFFF3F5F7)
-val LightSurfaceContainerHigh = Color(0xFFECEEF0)
-val LightSurfaceContainerHighest = Color(0xFFE4E6E8)
+val LightOnSurfaceVariant = Color(0xFF666666)
+val LightSurfaceContainer = Color(0xFFF2F4F6)
+val LightSurfaceContainerHigh = Color(0xFFEAECEF)
+val LightSurfaceContainerHighest = Color(0xFFE2E4E8)
 
-// Outline
-val LightOutline = Color(0xFFD0D3D8)
-val LightOutlineVariant = Color(0xFFE0E3E8)
+val LightOutline = Color(0xFFD0D4DA)
+val LightOutlineVariant = Color(0xFFE4E8EC)
 
-// Error
-val LightError = Color(0xFFDC2626)
+val LightError = Color(0xFFD42828)
 val LightOnError = Color(0xFFFFFFFF)
 
-// Inverse
-val LightInverseSurface = Color(0xFF2E3138)
+val LightInverseSurface = Color(0xFF1A1A1A)
 val LightInverseOnSurface = Color(0xFFF0F2F5)
-val LightInversePrimary = Color(0xFF8FE5FF)
+val LightInversePrimary = Color(0xFF8ECAFF)
 
 // ══════════════════════════════════════
-//  SHARED / BRAND COLORS
+//  BRAND / SHARED
 // ══════════════════════════════════════
-val VexiumBlue = Color(0xFF1A94E8)
-val VexiumCyan = Color(0xFF00F5FF)
-val VexiumPurple = Color(0xFFBB86FC)
-val VexiumGreen = Color(0xFF00FF85)
-val NeonOrange = Color(0xFFFF6B35)
-val NeonRed = Color(0xFFFF3B5C)
+val VexiumBlue = Color(0xFF2A6FAC)
 val SuccessGreen = Color(0xFF34D399)
 val WarningYellow = Color(0xFFFBBF24)
+val NeonOrange = Color(0xFFFF6B35)
+val NeonRed = Color(0xFFFF3B5C)
 
-// Google brand colors
+// Social brand colors
 val GoogleRed = Color(0xFFEA4335)
 val GoogleBlue = Color(0xFF4285F4)
 val GoogleYellow = Color(0xFFFBBC05)
 val GoogleGreen = Color(0xFF34A853)
-
-// Telegram
-val TelegramBlue = Color(0xFF0088CC)
+val TelegramBlue = Color(0xFF2AABEE)
