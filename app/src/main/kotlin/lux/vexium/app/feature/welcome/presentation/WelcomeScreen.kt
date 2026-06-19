@@ -29,16 +29,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,16 +57,15 @@ fun WelcomeScreen(
 ) {
     val isDark = isSystemInDarkTheme()
 
-    // Subtle breathing animation for the globe
-    val infiniteTransition = rememberInfiniteTransition(label = "globe_breath")
-    val breathe = infiniteTransition.animateFloat(
-        initialValue = 0.92f,
+    val infiniteTransition = rememberInfiniteTransition(label = "ambient")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.90f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
+            animation = tween(5000, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
-        label = "breathe",
+        label = "pulse",
     )
 
     Box(
@@ -73,9 +73,13 @@ fun WelcomeScreen(
             .fillMaxSize()
             .background(if (isDark) Color.Black else Color(0xFFF2F6FA)),
     ) {
-        // ── Globe / Sphere Effect ──
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawSphere(isDark = isDark, breatheScale = breathe.value)
+        // ── Half-sphere behind buttons ──
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .clipToBounds(),
+        ) {
+            drawHalfSphere(isDark = isDark, pulse = pulse)
         }
 
         // ── Content ──
@@ -85,14 +89,12 @@ fun WelcomeScreen(
                 .padding(horizontal = 30.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.weight(0.7f))
+            Spacer(modifier = Modifier.weight(0.65f))
 
-            // ── Logo (SVG) ──
             VexiumLogo(isDark = isDark)
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Tagline ──
             Text(
                 text = "Play.  Earn.  Trade.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -104,25 +106,21 @@ fun WelcomeScreen(
 
             Spacer(modifier = Modifier.weight(1.3f))
 
-            // ── Buttons ──
+            // ── Auth Buttons ──
             SocialButton(
                 iconRes = R.drawable.ic_google,
                 text = "Continue with Google",
                 isDark = isDark,
                 onClick = onGoogleClick,
             )
-
             Spacer(modifier = Modifier.height(10.dp))
-
             SocialButton(
                 iconRes = R.drawable.ic_telegram,
                 text = "Continue with Telegram",
                 isDark = isDark,
                 onClick = onTelegramClick,
             )
-
             Spacer(modifier = Modifier.height(10.dp))
-
             SocialButton(
                 iconRes = R.drawable.ic_email,
                 text = "Continue with Email",
@@ -132,12 +130,10 @@ fun WelcomeScreen(
 
             Spacer(modifier = Modifier.height(22.dp))
 
-            // ── OR divider ──
             OrDivider(isDark = isDark)
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // ── Guest ──
             Text(
                 text = "Try as Guest",
                 style = MaterialTheme.typography.bodyLarge,
@@ -155,7 +151,6 @@ fun WelcomeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Legal ──
             Text(
                 text = "By continuing, you agree to our Terms & Privacy Policy",
                 style = MaterialTheme.typography.labelSmall,
@@ -170,7 +165,161 @@ fun WelcomeScreen(
 }
 
 // ══════════════════════════════════════
-//  SOCIAL AUTH BUTTON
+//  HALF-SPHERE WITH GLOWING EDGE
+// ══════════════════════════════════════
+private fun DrawScope.drawHalfSphere(isDark: Boolean, pulse: Float) {
+    val w = size.width
+    val h = size.height
+
+    // Sphere is very large — only the top half (upper arc) is visible.
+    // It sits just above the button area. The center of the full sphere
+    // is placed below the visible area, so we only see the curved top edge.
+    val sphereRadius = w * 1.1f
+    val sphereCenterX = w / 2f
+    // Position: the top of the sphere arc should appear around 55-58% of screen height
+    val sphereCenterY = h * 0.58f + sphereRadius
+
+    if (isDark) {
+        // ── Dark: Subtle glow on the sphere edge ──
+
+        // Atmospheric haze behind the sphere top
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0.88f to Color.Transparent,
+                    0.94f to Color(0xFF222222).copy(alpha = 0.15f * pulse),
+                    0.97f to Color(0xFF444444).copy(alpha = 0.10f * pulse),
+                    1.0f to Color(0xFF666666).copy(alpha = 0.04f * pulse),
+                ),
+                center = Offset(sphereCenterX, sphereCenterY),
+                radius = sphereRadius,
+            ),
+            radius = sphereRadius,
+            center = Offset(sphereCenterX, sphereCenterY),
+        )
+
+        // Bright edge ring (the crescent glow)
+        // Outer glow (wide, soft)
+        drawCircle(
+            color = Color.Transparent,
+            radius = sphereRadius,
+            center = Offset(sphereCenterX, sphereCenterY),
+        )
+
+        for (i in 1..5) {
+            val strokeW = (6 - i) * 4f
+            val alpha = (0.06f - i * 0.01f).coerceAtLeast(0.005f) * pulse
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0.95f to Color.White.copy(alpha = alpha),
+                        1.0f to Color.White.copy(alpha = alpha * 0.3f),
+                    ),
+                    center = Offset(sphereCenterX, sphereCenterY),
+                    radius = sphereRadius + strokeW,
+                ),
+                radius = sphereRadius + strokeW / 2f,
+                center = Offset(sphereCenterX, sphereCenterY),
+                style = Stroke(width = strokeW),
+            )
+        }
+
+        // Sharp bright edge line
+        drawCircle(
+            brush = Brush.sweepGradient(
+                colorStops = arrayOf(
+                    0.0f to Color.White.copy(alpha = 0.20f * pulse),
+                    0.15f to Color.White.copy(alpha = 0.08f * pulse),
+                    0.35f to Color.White.copy(alpha = 0.02f * pulse),
+                    0.50f to Color.Transparent,
+                    0.65f to Color.White.copy(alpha = 0.02f * pulse),
+                    0.85f to Color.White.copy(alpha = 0.08f * pulse),
+                    1.0f to Color.White.copy(alpha = 0.20f * pulse),
+                ),
+                center = Offset(sphereCenterX, sphereCenterY),
+            ),
+            radius = sphereRadius,
+            center = Offset(sphereCenterX, sphereCenterY),
+            style = Stroke(width = 1.5f),
+        )
+
+        // Fill the sphere body (dark, slightly lighter than pure black)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0.0f to Color(0xFF060606),
+                    0.85f to Color(0xFF040404),
+                    0.96f to Color(0xFF080808),
+                    1.0f to Color(0xFF0C0C0C),
+                ),
+                center = Offset(sphereCenterX, sphereCenterY),
+                radius = sphereRadius,
+            ),
+            radius = sphereRadius - 1f,
+            center = Offset(sphereCenterX, sphereCenterY),
+        )
+
+    } else {
+        // ── Light: Icy blue sphere with soft glow edge ──
+
+        // Atmospheric glow around the edge
+        for (i in 1..4) {
+            val strokeW = (5 - i) * 6f
+            val alpha = (0.10f - i * 0.02f).coerceAtLeast(0.01f) * pulse
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0.94f to Color(0xFF8AC8E8).copy(alpha = alpha),
+                        1.0f to Color(0xFFB0DCF2).copy(alpha = alpha * 0.4f),
+                    ),
+                    center = Offset(sphereCenterX, sphereCenterY),
+                    radius = sphereRadius + strokeW,
+                ),
+                radius = sphereRadius + strokeW / 2f,
+                center = Offset(sphereCenterX, sphereCenterY),
+                style = Stroke(width = strokeW),
+            )
+        }
+
+        // Sharp edge line
+        drawCircle(
+            brush = Brush.sweepGradient(
+                colorStops = arrayOf(
+                    0.0f to Color(0xFF6AB4DC).copy(alpha = 0.30f * pulse),
+                    0.15f to Color(0xFF90CCE8).copy(alpha = 0.15f * pulse),
+                    0.35f to Color(0xFFB0DCF2).copy(alpha = 0.05f * pulse),
+                    0.50f to Color.Transparent,
+                    0.65f to Color(0xFFB0DCF2).copy(alpha = 0.05f * pulse),
+                    0.85f to Color(0xFF90CCE8).copy(alpha = 0.15f * pulse),
+                    1.0f to Color(0xFF6AB4DC).copy(alpha = 0.30f * pulse),
+                ),
+                center = Offset(sphereCenterX, sphereCenterY),
+            ),
+            radius = sphereRadius,
+            center = Offset(sphereCenterX, sphereCenterY),
+            style = Stroke(width = 1.5f),
+        )
+
+        // Fill sphere body (almost background color but slightly cooler)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0.0f to Color(0xFFEFF4F8),
+                    0.80f to Color(0xFFEAF0F5),
+                    0.95f to Color(0xFFE4ECF2),
+                    1.0f to Color(0xFFDDE6EE),
+                ),
+                center = Offset(sphereCenterX, sphereCenterY),
+                radius = sphereRadius,
+            ),
+            radius = sphereRadius - 1f,
+            center = Offset(sphereCenterX, sphereCenterY),
+        )
+    }
+}
+
+// ══════════════════════════════════════
+//  SOCIAL BUTTON
 // ══════════════════════════════════════
 @Composable
 private fun SocialButton(
@@ -179,7 +328,7 @@ private fun SocialButton(
     isDark: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(26.dp) // more curved edges
+    val shape = RoundedCornerShape(26.dp)
 
     Row(
         modifier = Modifier
@@ -199,10 +348,7 @@ private fun SocialButton(
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(
-                    bounded = true,
-                    color = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f),
-                ),
+                indication = ripple(bounded = true),
                 onClick = onClick,
             )
             .padding(horizontal = 24.dp),
@@ -226,13 +372,10 @@ private fun SocialButton(
 }
 
 // ══════════════════════════════════════
-//  "OR" DIVIDER
+//  DIVIDER
 // ══════════════════════════════════════
 @Composable
 private fun OrDivider(isDark: Boolean) {
-    val lineColor = if (isDark) Color(0xFF1A1A1A) else Color(0xFFDDE2E8)
-    val textColor = if (isDark) Color(0xFF444444) else Color(0xFFAAB0B8)
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -241,173 +384,19 @@ private fun OrDivider(isDark: Boolean) {
             modifier = Modifier
                 .weight(1f)
                 .height(0.5.dp)
-                .background(lineColor),
+                .background(if (isDark) Color(0xFF1A1A1A) else Color(0xFFDDE2E8)),
         )
         Text(
             text = "or",
             modifier = Modifier.padding(horizontal = 20.dp),
             style = MaterialTheme.typography.bodySmall,
-            color = textColor,
+            color = if (isDark) Color(0xFF444444) else Color(0xFFAAB0B8),
         )
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(0.5.dp)
-                .background(lineColor),
-        )
-    }
-}
-
-// ══════════════════════════════════════
-//  3D SPHERE / GLOBE EFFECT
-// ══════════════════════════════════════
-private fun DrawScope.drawSphere(isDark: Boolean, breatheScale: Float) {
-    val w = size.width
-    val h = size.height
-
-    // Sphere sits below center, between logo and buttons
-    val sphereX = w / 2f
-    val sphereY = h * 0.56f
-    val sphereRadius = w * 0.60f * breatheScale
-
-    if (isDark) {
-        // ── Dark mode sphere: subtle luminous dome ──
-
-        // Bottom half mask — the sphere rises from below
-        // Large atmospheric haze
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFF1A1A1A).copy(alpha = 0.35f),
-                    0.3f to Color(0xFF111111).copy(alpha = 0.20f),
-                    0.6f to Color(0xFF0A0A0A).copy(alpha = 0.08f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY),
-                radius = sphereRadius,
-            ),
-            radius = sphereRadius,
-            center = Offset(sphereX, sphereY),
-        )
-
-        // Bright horizon arc — the "crescent" of light at the top of the sphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFFFFFFFF).copy(alpha = 0.09f),
-                    0.4f to Color(0xFFDDDDDD).copy(alpha = 0.04f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY - sphereRadius * 0.55f),
-                radius = sphereRadius * 0.45f,
-            ),
-            radius = sphereRadius * 0.45f,
-            center = Offset(sphereX, sphereY - sphereRadius * 0.55f),
-        )
-
-        // Very tight bright highlight on the horizon line
-        val horizonPath = Path().apply {
-            arcTo(
-                rect = Rect(
-                    left = sphereX - sphereRadius * 0.8f,
-                    top = sphereY - sphereRadius * 0.15f,
-                    right = sphereX + sphereRadius * 0.8f,
-                    bottom = sphereY + sphereRadius * 0.15f,
-                ),
-                startAngleDegrees = 180f,
-                sweepAngleDegrees = 180f,
-                forceMoveTo = false,
-            )
-            close()
-        }
-        drawPath(
-            path = horizonPath,
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color.White.copy(alpha = 0.12f),
-                    0.5f to Color.White.copy(alpha = 0.04f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY - sphereRadius * 0.05f),
-                radius = sphereRadius * 0.5f,
-            ),
-        )
-
-    } else {
-        // ── Light mode sphere: icy blue atmospheric orb ──
-
-        // Large blue atmosphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFFC4E2F4).copy(alpha = 0.55f),
-                    0.35f to Color(0xFFD6ECF8).copy(alpha = 0.35f),
-                    0.65f to Color(0xFFE6F2FA).copy(alpha = 0.15f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY),
-                radius = sphereRadius * 1.1f,
-            ),
-            radius = sphereRadius * 1.1f,
-            center = Offset(sphereX, sphereY),
-        )
-
-        // Inner bright ice core
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFFB0DCF2).copy(alpha = 0.40f),
-                    0.4f to Color(0xFFC8E8F8).copy(alpha = 0.20f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY - sphereRadius * 0.15f),
-                radius = sphereRadius * 0.6f,
-            ),
-            radius = sphereRadius * 0.6f,
-            center = Offset(sphereX, sphereY - sphereRadius * 0.15f),
-        )
-
-        // White crescent highlight at top
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color.White.copy(alpha = 0.55f),
-                    0.35f to Color.White.copy(alpha = 0.20f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY - sphereRadius * 0.52f),
-                radius = sphereRadius * 0.28f,
-            ),
-            radius = sphereRadius * 0.28f,
-            center = Offset(sphereX, sphereY - sphereRadius * 0.52f),
-        )
-
-        // Horizon glow line
-        val horizonPath = Path().apply {
-            arcTo(
-                rect = Rect(
-                    left = sphereX - sphereRadius * 0.75f,
-                    top = sphereY - sphereRadius * 0.12f,
-                    right = sphereX + sphereRadius * 0.75f,
-                    bottom = sphereY + sphereRadius * 0.12f,
-                ),
-                startAngleDegrees = 180f,
-                sweepAngleDegrees = 180f,
-                forceMoveTo = false,
-            )
-            close()
-        }
-        drawPath(
-            path = horizonPath,
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color.White.copy(alpha = 0.40f),
-                    0.5f to Color(0xFFDCEEF8).copy(alpha = 0.15f),
-                    1.0f to Color.Transparent,
-                ),
-                center = Offset(sphereX, sphereY - sphereRadius * 0.03f),
-                radius = sphereRadius * 0.5f,
-            ),
+                .background(if (isDark) Color(0xFF1A1A1A) else Color(0xFFDDE2E8)),
         )
     }
 }

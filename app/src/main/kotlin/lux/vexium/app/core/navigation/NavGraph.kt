@@ -16,6 +16,7 @@ import lux.vexium.app.feature.profile.presentation.ProfileScreen
 import lux.vexium.app.feature.settings.presentation.GeneralSettingsScreen
 import lux.vexium.app.feature.settings.presentation.SettingsViewModel
 import lux.vexium.app.feature.splash.presentation.SplashScreen
+import lux.vexium.app.feature.splash.presentation.SplashScreenAlt
 import lux.vexium.app.feature.trade.presentation.TradeScreen
 import lux.vexium.app.feature.welcome.presentation.WelcomeScreen
 
@@ -59,15 +60,26 @@ fun VexiumNavHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Splash,
+            startDestination = Screen.SplashAlt,
             modifier = Modifier.padding(innerPadding),
         ) {
-            // ── Splash ──
+            // ── Splash (original — neon glow border) ──
             composable<Screen.Splash> {
                 SplashScreen(
                     onSplashFinished = {
                         navController.navigate(Screen.Welcome) {
                             popUpTo(Screen.Splash) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            // ── Splash Alt (sphere + warm lightning sweep) ──
+            composable<Screen.SplashAlt> {
+                SplashScreenAlt(
+                    onSplashFinished = {
+                        navController.navigate(Screen.Welcome) {
+                            popUpTo(Screen.SplashAlt) { inclusive = true }
                         }
                     },
                 )

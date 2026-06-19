@@ -9,6 +9,7 @@ sealed interface Screen {
 
     // ── Splash ──
     @Serializable data object Splash : Screen
+    @Serializable data object SplashAlt : Screen
 
     // ── Welcome / Auth ──
     @Serializable data object Welcome : Screen
