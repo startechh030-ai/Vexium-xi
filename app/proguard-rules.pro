@@ -44,3 +44,12 @@
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
 -dontwarn androidx.room.paging.**
+
+# Credential Manager (Google Sign-In)
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** { *; }
+
+# Supabase / Ktor
+-dontwarn io.ktor.**
+-keep class io.github.jan.supabase.** { *; }
+-keep class io.ktor.** { *; }

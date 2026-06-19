@@ -19,6 +19,15 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Load secrets from local.properties
+        val localProperties = java.util.Properties().apply {
+            val file = rootProject.file("local.properties")
+            if (file.exists()) load(file.inputStream())
+        }
+        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\"")
     }
 
     buildTypes {
@@ -41,10 +50,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // ❌ REMOVE this block – it’s replaced by the kotlin {} block below
-    // kotlinOptions {
-    //     jvmTarget = "17"
-    // }
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 
     buildFeatures {
         compose = true
@@ -55,13 +63,6 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-    }
-}
-
-// ✅ NEW: Kotlin compiler options (required for Kotlin 2.0+)
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -111,7 +112,7 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
 
-        // ── Image Loading ──
+    // ── Image Loading ──
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.coil.svg)
@@ -123,8 +124,27 @@ dependencies {
     // ── DataStore ──
     implementation(libs.datastore.preferences)
 
+    // ── Lottie Animations ──
+    implementation(libs.lottie.compose)
+
+
+
     // ── Splash Screen ──
     implementation(libs.androidx.splashscreen)
+
+    // ── Supabase ──
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.compose.auth)
+    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.utils)
+
+    // ── Google Credential Manager (Sign In) ──
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services)
+    implementation(libs.googleid)
 
     // ── Testing ──
     testImplementation(libs.junit)

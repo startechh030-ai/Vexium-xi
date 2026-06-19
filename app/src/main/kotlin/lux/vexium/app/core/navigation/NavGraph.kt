@@ -1,14 +1,23 @@
 package lux.vexium.app.core.navigation
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.github.jan.supabase.compose.auth.ComposeAuth
+import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
+import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
+import lux.vexium.app.feature.auth.presentation.AuthViewModel
 import lux.vexium.app.feature.games.presentation.GamesScreen
 import lux.vexium.app.feature.home.presentation.HomeScreen
 import lux.vexium.app.feature.nft.presentation.NftScreen
@@ -23,11 +32,65 @@ import lux.vexium.app.feature.welcome.presentation.WelcomeScreen
 @Composable
 fun VexiumNavHost(
     settingsViewModel: SettingsViewModel,
+    composeAuth: ComposeAuth,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val context = LocalContext.current
 
-    // Determine current route for bottom bar highlighting
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Navigate to Home when user signs in
+    LaunchedEffect(authState.isSignedIn) {
+        if (authState.isSignedIn) {
+            val currentRoute = navController.currentDestination?.route
+            val isOnAuthScreen = currentRoute == Screen.Welcome::class.qualifiedName
+            if (isOnAuthScreen) {
+                navController.navigate(Screen.Home) {
+                    popUpTo(Screen.Welcome) { inclusive = true }
+                }
+            }
+        }
+    }
+
+    // Show auth errors as toast
+    LaunchedEffect(authState.error) {
+        authState.error?.let { error ->
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            authViewModel.clearError()
+        }
+    }
+
+    // Google Sign-In handler
+    val googleSignInState = composeAuth.rememberSignInWithGoogle(
+        onResult = { result ->
+            when (result) {
+                is NativeSignInResult.Success -> {
+                    // Session is automatically managed by Supabase Auth
+                }
+                is NativeSignInResult.ClosedByUser -> {
+                    // User cancelled — do nothing
+                }
+                is NativeSignInResult.Error -> {
+                    Toast.makeText(
+                        context,
+                        "Google Sign-In failed: ${result.message}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                is NativeSignInResult.NetworkError -> {
+                    Toast.makeText(
+                        context,
+                        "Network error. Check your connection.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        },
+    )
+
+    // Determine current route for bottom bar
     val currentRoute: Screen? = when (navBackStackEntry?.destination?.route) {
         Screen.Home::class.qualifiedName -> Screen.Home
         Screen.Games::class.qualifiedName -> Screen.Games
@@ -37,7 +100,6 @@ fun VexiumNavHost(
         else -> null
     }
 
-    // Show bottom bar only on main tabs
     val showBottomBar = currentRoute != null
 
     Scaffold(
@@ -47,9 +109,7 @@ fun VexiumNavHost(
                     currentRoute = currentRoute,
                     onNavigate = { screen ->
                         navController.navigate(screen) {
-                            popUpTo(Screen.Home) {
-                                saveState = true
-                            }
+                            popUpTo(Screen.Home) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -63,7 +123,7 @@ fun VexiumNavHost(
             startDestination = Screen.SplashAlt,
             modifier = Modifier.padding(innerPadding),
         ) {
-            // ── Splash (original — neon glow border) ──
+            // ── Splash (original) ──
             composable<Screen.Splash> {
                 SplashScreen(
                     onSplashFinished = {
@@ -74,7 +134,7 @@ fun VexiumNavHost(
                 )
             }
 
-            // ── Splash Alt (sphere + warm lightning sweep) ──
+            // ── Splash Alt (sphere + sweep) ──
             composable<Screen.SplashAlt> {
                 SplashScreenAlt(
                     onSplashFinished = {
@@ -88,9 +148,9 @@ fun VexiumNavHost(
             // ── Welcome / Auth ──
             composable<Screen.Welcome> {
                 WelcomeScreen(
-                    onGoogleClick = { /* TODO: Google sign in */ },
+                    onGoogleClick = { googleSignInState.startFlow() },
                     onTelegramClick = { /* TODO: Telegram auth */ },
-                    onEmailClick = { /* TODO: Email auth */ },
+                    onEmailClick = { /* TODO: Email auth screen */ },
                     onGuestClick = {
                         navController.navigate(Screen.Home) {
                             popUpTo(Screen.Welcome) { inclusive = true }
@@ -115,17 +175,9 @@ fun VexiumNavHost(
                 )
             }
 
-            composable<Screen.Nft> {
-                NftScreen()
-            }
-
-            composable<Screen.Trade> {
-                TradeScreen()
-            }
-
-            composable<Screen.Profile> {
-                ProfileScreen()
-            }
+            composable<Screen.Nft> { NftScreen() }
+            composable<Screen.Trade> { TradeScreen() }
+            composable<Screen.Profile> { ProfileScreen() }
 
             // ── Settings ──
             composable<Screen.Settings> {
