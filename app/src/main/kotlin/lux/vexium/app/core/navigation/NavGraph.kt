@@ -1,5 +1,6 @@
 package lux.vexium.app.core.navigation
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -29,6 +30,8 @@ import lux.vexium.app.feature.splash.presentation.SplashScreenAlt
 import lux.vexium.app.feature.trade.presentation.TradeScreen
 import lux.vexium.app.feature.welcome.presentation.WelcomeScreen
 
+private const val TAG = "VexiumAuth"
+
 @Composable
 fun VexiumNavHost(
     settingsViewModel: SettingsViewModel,
@@ -44,6 +47,7 @@ fun VexiumNavHost(
     // Navigate to Home when user signs in
     LaunchedEffect(authState.isSignedIn) {
         if (authState.isSignedIn) {
+            Log.d(TAG, "✅ User signed in! Navigating to Home")
             val currentRoute = navController.currentDestination?.route
             val isOnAuthScreen = currentRoute == Screen.Welcome::class.qualifiedName
             if (isOnAuthScreen) {
@@ -57,6 +61,7 @@ fun VexiumNavHost(
     // Show auth errors as toast
     LaunchedEffect(authState.error) {
         authState.error?.let { error ->
+            Log.e(TAG, "❌ Auth error: $error")
             Toast.makeText(context, error, Toast.LENGTH_LONG).show()
             authViewModel.clearError()
         }
@@ -65,24 +70,29 @@ fun VexiumNavHost(
     // Google Sign-In handler
     val googleSignInState = composeAuth.rememberSignInWithGoogle(
         onResult = { result ->
+            Log.d(TAG, "🔵 Google Sign-In result: $result")
             when (result) {
                 is NativeSignInResult.Success -> {
-                    // Session is automatically managed by Supabase Auth
+                    Log.d(TAG, "✅ Google Sign-In SUCCESS")
+                    Toast.makeText(context, "Signed in successfully!", Toast.LENGTH_SHORT).show()
                 }
                 is NativeSignInResult.ClosedByUser -> {
-                    // User cancelled — do nothing
+                    Log.d(TAG, "⚪ Google Sign-In cancelled by user")
+                    Toast.makeText(context, "Sign in cancelled", Toast.LENGTH_SHORT).show()
                 }
                 is NativeSignInResult.Error -> {
+                    Log.e(TAG, "❌ Google Sign-In ERROR: ${result.message}")
                     Toast.makeText(
                         context,
-                        "Google Sign-In failed: ${result.message}",
+                        "Sign-In failed: ${result.message}",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
                 is NativeSignInResult.NetworkError -> {
+                    Log.e(TAG, "❌ Google Sign-In NETWORK ERROR: ${result.message}")
                     Toast.makeText(
                         context,
-                        "Network error. Check your connection.",
+                        "Network error: ${result.message}",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -148,7 +158,10 @@ fun VexiumNavHost(
             // ── Welcome / Auth ──
             composable<Screen.Welcome> {
                 WelcomeScreen(
-                    onGoogleClick = { googleSignInState.startFlow() },
+                    onGoogleClick = {
+                        Log.d(TAG, "🔵 Starting Google Sign-In flow...")
+                        googleSignInState.startFlow()
+                    },
                     onTelegramClick = { /* TODO: Telegram auth */ },
                     onEmailClick = { /* TODO: Email auth screen */ },
                     onGuestClick = {
