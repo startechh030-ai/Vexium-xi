@@ -14,7 +14,7 @@ import io.github.jan.supabase.compose.auth.googleNativeLogin
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
-import lux.vexium.app.BuildConfig
+import lux.vexium.app.core.common.Constants
 import javax.inject.Singleton
 
 @Module
@@ -25,8 +25,8 @@ object SupabaseModule {
     @Singleton
     fun provideSupabaseClient(): SupabaseClient {
         return createSupabaseClient(
-            supabaseUrl = BuildConfig.SUPABASE_URL,
-            supabaseKey = BuildConfig.SUPABASE_ANON_KEY,
+            supabaseUrl = Constants.SUPABASE_URL,
+            supabaseKey = Constants.SUPABASE_ANON_KEY,
         ) {
             install(Auth) {
                 flowType = FlowType.PKCE
@@ -36,7 +36,7 @@ object SupabaseModule {
             install(Postgrest)
             install(ComposeAuth) {
                 googleNativeLogin(
-                    serverClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID,
+                    serverClientId = Constants.GOOGLE_WEB_CLIENT_ID,
                 )
             }
         }
