@@ -14,6 +14,7 @@
         android:theme="@style/Theme.Vexium"
         tools:targetApi="35">
 
+        <!-- Main launcher activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -23,5 +24,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- OAuth callback handler -->
+        <activity
+            android:name="io.github.jan.supabase.compose.auth.composable.NativeAuthActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="io.supabase.vexxium"
+                    android:host="login-callback" />
+            </intent-filter>
+        </activity>
+
     </application>
 </manifest>
