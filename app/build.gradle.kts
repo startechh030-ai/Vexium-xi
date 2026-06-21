@@ -11,6 +11,15 @@ android {
     namespace = "lux.vexium.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("vexium-release-key.keystore")
+            storePassword = "Startech030"
+            keyAlias = "vexium"
+            keyPassword = "Startech030"
+        }
+    }
+
     defaultConfig {
         applicationId = "lux.vexium.app"
         minSdk = libs.versions.minSdk.get().toInt()
@@ -24,10 +33,12 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("release")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
