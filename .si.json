@@ -29,6 +29,10 @@
     ".kt": {
       "enabled": true,
       "run": "kotlin-language-server"
+    },
+    ".svg": {
+      "enabled": true,
+      "run": "lemminx"
     }
   }
 }
