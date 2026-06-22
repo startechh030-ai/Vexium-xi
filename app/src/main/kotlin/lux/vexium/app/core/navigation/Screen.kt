@@ -2,17 +2,17 @@ package lux.vexium.app.core.navigation
 
 import kotlinx.serialization.Serializable
 
-/**
- * Type-safe navigation routes using Kotlin Serialization.
- */
 sealed interface Screen {
 
     // ── Splash ──
     @Serializable data object Splash : Screen
     @Serializable data object SplashAlt : Screen
 
-    // ── Welcome / Auth ──
+    // ── Auth Flow ──
     @Serializable data object Welcome : Screen
+    @Serializable data object SetupUsername : Screen
+    @Serializable data object CreatePin : Screen
+    @Serializable data object VerifyPin : Screen
     @Serializable data object Login : Screen
     @Serializable data object Register : Screen
 

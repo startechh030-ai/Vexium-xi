@@ -1,5 +1,6 @@
 package lux.vexium.app.core.navigation
 
+import android.app.Activity
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.padding
@@ -7,8 +8,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -19,6 +24,11 @@ import io.github.jan.supabase.compose.auth.ComposeAuth
 import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
 import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
 import lux.vexium.app.feature.auth.presentation.AuthViewModel
+import lux.vexium.app.feature.auth.presentation.BiometricHelper
+import lux.vexium.app.feature.auth.presentation.BiometricSetupScreen
+import lux.vexium.app.feature.auth.presentation.PinMode
+import lux.vexium.app.feature.auth.presentation.PinScreen
+import lux.vexium.app.feature.auth.presentation.UsernameSheet
 import lux.vexium.app.feature.games.presentation.GamesScreen
 import lux.vexium.app.feature.home.presentation.HomeScreen
 import lux.vexium.app.feature.nft.presentation.NftScreen
@@ -44,63 +54,104 @@ fun VexiumNavHost(
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
 
-    // Navigate to Home when user signs in
-    LaunchedEffect(authState.isSignedIn) {
+    // Track if username sheet should show
+    var showUsernameSheet by remember { mutableStateOf(false) }
+
+    // ── React to auth state changes ──
+    LaunchedEffect(authState.isSignedIn, authState.needsUsername, authState.needsPin, authState.allSetupComplete) {
+        val currentRoute = navController.currentDestination?.route
+
         if (authState.isSignedIn) {
-            Log.d(TAG, "✅ User signed in! Navigating to Home")
-            val currentRoute = navController.currentDestination?.route
-            val isOnAuthScreen = currentRoute == Screen.Welcome::class.qualifiedName
-            if (isOnAuthScreen) {
-                navController.navigate(Screen.Home) {
-                    popUpTo(Screen.Welcome) { inclusive = true }
+            val isOnWelcome = currentRoute == Screen.Welcome::class.qualifiedName
+
+            when {
+                // New user needs username
+                authState.needsUsername && isOnWelcome -> {
+                    showUsernameSheet = true
+                }
+                // Needs PIN creation
+                authState.needsPin && !authState.needsUsername -> {
+                    showUsernameSheet = false
+                    if (currentRoute != Screen.CreatePin::class.qualifiedName) {
+                        navController.navigate(Screen.CreatePin) {
+                            popUpTo(Screen.Welcome) { inclusive = true }
+                        }
+                    }
+                }
+                // Has PIN, needs verification (returning user)
+                !authState.needsPin && !authState.pinVerified && !authState.allSetupComplete -> {
+                    if (currentRoute != Screen.VerifyPin::class.qualifiedName &&
+                        currentRoute != Screen.CreatePin::class.qualifiedName) {
+                        navController.navigate(Screen.VerifyPin) {
+                            popUpTo(Screen.Welcome) { inclusive = true }
+                        }
+                    }
+                }
+                // All setup complete → Home
+                authState.allSetupComplete -> {
+                    showUsernameSheet = false
+                    val notOnMainTab = currentRoute != Screen.Home::class.qualifiedName &&
+                        currentRoute != Screen.Games::class.qualifiedName &&
+                        currentRoute != Screen.Nft::class.qualifiedName &&
+                        currentRoute != Screen.Trade::class.qualifiedName &&
+                        currentRoute != Screen.Profile::class.qualifiedName
+
+                    if (notOnMainTab) {
+                        navController.navigate(Screen.Home) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 }
             }
         }
     }
 
-    // Show auth errors as toast
+    // ── Show errors ──
     LaunchedEffect(authState.error) {
         authState.error?.let { error ->
-            Log.e(TAG, "❌ Auth error: $error")
+            Log.e(TAG, "Auth error: $error")
             Toast.makeText(context, error, Toast.LENGTH_LONG).show()
             authViewModel.clearError()
         }
     }
 
-    // Google Sign-In handler
+    // ── Google Sign-In ──
     val googleSignInState = composeAuth.rememberSignInWithGoogle(
         onResult = { result ->
-            Log.d(TAG, "🔵 Google Sign-In result: $result")
+            Log.d(TAG, "Google result: $result")
             when (result) {
                 is NativeSignInResult.Success -> {
-                    Log.d(TAG, "✅ Google Sign-In SUCCESS")
-                    Toast.makeText(context, "Signed in successfully!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Signed in!", Toast.LENGTH_SHORT).show()
                 }
                 is NativeSignInResult.ClosedByUser -> {
-                    Log.d(TAG, "⚪ Google Sign-In cancelled by user")
                     Toast.makeText(context, "Sign in cancelled", Toast.LENGTH_SHORT).show()
                 }
                 is NativeSignInResult.Error -> {
-                    Log.e(TAG, "❌ Google Sign-In ERROR: ${result.message}")
-                    Toast.makeText(
-                        context,
-                        "Sign-In failed: ${result.message}",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    Toast.makeText(context, "Failed: ${result.message}", Toast.LENGTH_LONG).show()
                 }
                 is NativeSignInResult.NetworkError -> {
-                    Log.e(TAG, "❌ Google Sign-In NETWORK ERROR: ${result.message}")
-                    Toast.makeText(
-                        context,
-                        "Network error: ${result.message}",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    Toast.makeText(context, "Network error: ${result.message}", Toast.LENGTH_LONG).show()
                 }
             }
         },
     )
 
-    // Determine current route for bottom bar
+    // ── Username bottom sheet ──
+    if (showUsernameSheet) {
+        UsernameSheet(
+            onDismiss = { showUsernameSheet = false },
+            onSkip = {
+                showUsernameSheet = false
+                authViewModel.skipUsername()
+            },
+            onContinue = { username, referral ->
+                showUsernameSheet = false
+                authViewModel.saveUsername(username, referral)
+            },
+        )
+    }
+
+    // ── Bottom bar ──
     val currentRoute: Screen? = when (navBackStackEntry?.destination?.route) {
         Screen.Home::class.qualifiedName -> Screen.Home
         Screen.Games::class.qualifiedName -> Screen.Games
@@ -109,7 +160,6 @@ fun VexiumNavHost(
         Screen.Profile::class.qualifiedName -> Screen.Profile
         else -> null
     }
-
     val showBottomBar = currentRoute != null
 
     Scaffold(
@@ -133,7 +183,6 @@ fun VexiumNavHost(
             startDestination = Screen.SplashAlt,
             modifier = Modifier.padding(innerPadding),
         ) {
-            // ── Splash (original) ──
             composable<Screen.Splash> {
                 SplashScreen(
                     onSplashFinished = {
@@ -144,7 +193,6 @@ fun VexiumNavHost(
                 )
             }
 
-            // ── Splash Alt (sphere + sweep) ──
             composable<Screen.SplashAlt> {
                 SplashScreenAlt(
                     onSplashFinished = {
@@ -155,18 +203,84 @@ fun VexiumNavHost(
                 )
             }
 
-            // ── Welcome / Auth ──
             composable<Screen.Welcome> {
                 WelcomeScreen(
                     onGoogleClick = {
-                        Log.d(TAG, "🔵 Starting Google Sign-In flow...")
+                        Log.d(TAG, "Starting Google Sign-In...")
                         googleSignInState.startFlow()
                     },
-                    onTelegramClick = { /* TODO: Telegram auth */ },
-                    onEmailClick = { /* TODO: Email auth screen */ },
+                    onTelegramClick = { },
+                    onEmailClick = { },
                     onGuestClick = {
                         navController.navigate(Screen.Home) {
                             popUpTo(Screen.Welcome) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable<Screen.CreatePin> {
+                PinScreen(
+                    mode = PinMode.CREATE,
+                    onPinConfirmed = { pin ->
+                        authViewModel.savePin(pin)
+                    },
+                    onBackClick = {
+                        navController.popBackStack()
+                    },
+                )
+
+                // After PIN saved, show biometric setup
+                if (authState.showBiometricPrompt && !authState.needsPin) {
+                    val activity = context as? FragmentActivity
+                    val canBiometric = activity != null && BiometricHelper.canAuthenticate(context)
+
+                    if (canBiometric) {
+                        BiometricSetupScreen(
+                            onEnable = {
+                                authViewModel.enableBiometric()
+                                if (activity != null) {
+                                    BiometricHelper.authenticate(
+                                        activity = activity,
+                                        title = "Enable Biometrics",
+                                        subtitle = "Verify to enable biometric login",
+                                        onSuccess = { authViewModel.onBiometricSuccess() },
+                                        onError = { authViewModel.skipBiometric() },
+                                        onCancel = { authViewModel.skipBiometric() },
+                                    )
+                                }
+                            },
+                            onSkip = {
+                                authViewModel.skipBiometric()
+                            },
+                        )
+                    }
+                }
+            }
+
+            composable<Screen.VerifyPin> {
+                val activity = context as? FragmentActivity
+
+                PinScreen(
+                    mode = PinMode.VERIFY,
+                    onPinConfirmed = { pin ->
+                        authViewModel.verifyPin(pin)
+                    },
+                    onBiometricClick = if (activity != null && BiometricHelper.canAuthenticate(context)) {
+                        {
+                            BiometricHelper.authenticate(
+                                activity = activity,
+                                onSuccess = { authViewModel.onBiometricSuccess() },
+                                onError = { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                },
+                            )
+                        }
+                    } else null,
+                    onBackClick = {
+                        authViewModel.signOut()
+                        navController.navigate(Screen.Welcome) {
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                 )
@@ -176,7 +290,13 @@ fun VexiumNavHost(
             composable<Screen.Home> {
                 HomeScreen(
                     onNavigateToGames = { navController.navigate(Screen.Games) },
-                    onNavigateToWallet = { navController.navigate(Screen.Wallet) },
+                    onNavigateToWallet = { },
+                    onLogout = {
+                        authViewModel.signOut()
+                        navController.navigate(Screen.Welcome) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
                 )
             }
 
@@ -192,7 +312,6 @@ fun VexiumNavHost(
             composable<Screen.Trade> { TradeScreen() }
             composable<Screen.Profile> { ProfileScreen() }
 
-            // ── Settings ──
             composable<Screen.Settings> {
                 GeneralSettingsScreen(
                     settingsViewModel = settingsViewModel,

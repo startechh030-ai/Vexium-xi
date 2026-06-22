@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.TrendingUp
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 fun HomeScreen(
     onNavigateToGames: () -> Unit = {},
     onNavigateToWallet: () -> Unit = {},
+    onLogout: () -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
@@ -72,12 +74,21 @@ fun HomeScreen(
                     color = colorScheme.primary,
                 )
             }
-            IconButton(onClick = { }) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "Notifications",
-                    tint = colorScheme.onSurfaceVariant,
-                )
+            Row {
+                IconButton(onClick = { }) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "Notifications",
+                        tint = colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onLogout) {
+                    Icon(
+                        imageVector = Icons.Default.Logout,
+                        contentDescription = "Logout",
+                        tint = colorScheme.error,
+                    )
+                }
             }
         }
 

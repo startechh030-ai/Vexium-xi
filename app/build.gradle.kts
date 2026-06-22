@@ -133,6 +133,9 @@ dependencies {
     // ── Splash Screen ──
     implementation(libs.androidx.splashscreen)
 
+    // ── Biometric ──
+    implementation(libs.androidx.biometric)
+
     // ── Supabase ──
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.auth)
