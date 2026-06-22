@@ -58,6 +58,9 @@ coreKtx = "1.18.0"
 # Splash Screen
 splashscreen = "1.0.1"
 
+# Biometric
+biometric = "1.1.0"
+
 # Material
 material3 = "1.4.0"
 
@@ -121,6 +124,7 @@ lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", versio
 
 # Splash Screen
 androidx-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 
 # Supabase
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
