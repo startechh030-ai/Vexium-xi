@@ -1,6 +1,5 @@
 package lux.vexium.app.core.navigation
 
-import android.app.Activity
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.padding
@@ -54,59 +53,102 @@ fun VexiumNavHost(
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
 
-    // Track if username sheet should show
     var showUsernameSheet by remember { mutableStateOf(false) }
+    var showBiometricSetup by remember { mutableStateOf(false) }
 
-    // ── React to auth state changes ──
-    LaunchedEffect(authState.isSignedIn, authState.needsUsername, authState.needsPin, authState.allSetupComplete) {
-        val currentRoute = navController.currentDestination?.route
+    // Helper: check if currently on a specific screen
+    val currentRouteName = navBackStackEntry?.destination?.route
 
-        if (authState.isSignedIn) {
-            val isOnWelcome = currentRoute == Screen.Welcome::class.qualifiedName
+    fun isOnScreen(vararg screens: Any): Boolean {
+        return screens.any { screen ->
+            currentRouteName?.contains(screen::class.qualifiedName ?: "") == true
+        }
+    }
 
-            when {
-                // New user needs username
-                authState.needsUsername && isOnWelcome -> {
-                    showUsernameSheet = true
+    // Main tab routes for bottom bar
+    val mainTabs = listOf(
+        Screen.Home, Screen.Games, Screen.Nft, Screen.Trade, Screen.Profile,
+    )
+
+    fun isOnMainTab(): Boolean = mainTabs.any { tab ->
+        currentRouteName?.contains(tab::class.qualifiedName ?: "") == true
+    }
+
+    // ════════════════════════════════════
+    // AUTH FLOW STATE MACHINE
+    // ════════════════════════════════════
+    LaunchedEffect(
+        authState.isSignedIn,
+        authState.needsUsername,
+        authState.needsPin,
+        authState.pinVerified,
+        authState.allSetupComplete,
+        authState.showBiometricPrompt,
+    ) {
+        Log.d(TAG, "State: signedIn=${authState.isSignedIn}, needsUser=${authState.needsUsername}, needsPin=${authState.needsPin}, pinVerified=${authState.pinVerified}, allComplete=${authState.allSetupComplete}, route=$currentRouteName")
+
+        if (!authState.isSignedIn) return@LaunchedEffect
+
+        when {
+            // Step 1: New user needs username → show bottom sheet
+            authState.needsUsername -> {
+                Log.d(TAG, "→ Showing username sheet")
+                showUsernameSheet = true
+            }
+
+            // Step 2: Needs to create PIN
+            authState.needsPin && !authState.needsUsername -> {
+                Log.d(TAG, "→ Navigate to CreatePin")
+                showUsernameSheet = false
+                navController.navigate(Screen.CreatePin) {
+                    popUpTo(0) { inclusive = true }
                 }
-                // Needs PIN creation
-                authState.needsPin && !authState.needsUsername -> {
-                    showUsernameSheet = false
-                    if (currentRoute != Screen.CreatePin::class.qualifiedName) {
-                        navController.navigate(Screen.CreatePin) {
-                            popUpTo(Screen.Welcome) { inclusive = true }
-                        }
+            }
+
+            // Step 3: PIN just created, show biometric setup
+            authState.showBiometricPrompt && authState.pinVerified -> {
+                Log.d(TAG, "→ Showing biometric setup")
+                showBiometricSetup = true
+            }
+
+            // Step 4: All complete → go home
+            authState.allSetupComplete && authState.pinVerified -> {
+                Log.d(TAG, "→ Navigate to Home (all complete)")
+                showUsernameSheet = false
+                showBiometricSetup = false
+                if (!isOnMainTab()) {
+                    navController.navigate(Screen.Home) {
+                        popUpTo(0) { inclusive = true }
                     }
                 }
-                // Has PIN, needs verification (returning user)
-                !authState.needsPin && !authState.pinVerified && !authState.allSetupComplete -> {
-                    if (currentRoute != Screen.VerifyPin::class.qualifiedName &&
-                        currentRoute != Screen.CreatePin::class.qualifiedName) {
-                        navController.navigate(Screen.VerifyPin) {
-                            popUpTo(Screen.Welcome) { inclusive = true }
-                        }
-                    }
-                }
-                // All setup complete → Home
-                authState.allSetupComplete -> {
-                    showUsernameSheet = false
-                    val notOnMainTab = currentRoute != Screen.Home::class.qualifiedName &&
-                        currentRoute != Screen.Games::class.qualifiedName &&
-                        currentRoute != Screen.Nft::class.qualifiedName &&
-                        currentRoute != Screen.Trade::class.qualifiedName &&
-                        currentRoute != Screen.Profile::class.qualifiedName
+            }
 
-                    if (notOnMainTab) {
-                        navController.navigate(Screen.Home) {
-                            popUpTo(0) { inclusive = true }
-                        }
+            // Returning user: has PIN, not yet verified
+            !authState.needsPin && !authState.needsUsername && !authState.pinVerified -> {
+                Log.d(TAG, "→ Navigate to VerifyPin")
+                if (!isOnScreen(Screen.VerifyPin)) {
+                    navController.navigate(Screen.VerifyPin) {
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             }
         }
     }
 
-    // ── Show errors ──
+    // ── Signed out → back to welcome ──
+    LaunchedEffect(authState.isSignedIn) {
+        if (!authState.isSignedIn && !authState.isLoading) {
+            val isOnAuthScreen = isOnScreen(Screen.Welcome, Screen.Splash, Screen.SplashAlt)
+            if (!isOnAuthScreen && currentRouteName != null) {
+                Log.d(TAG, "→ Signed out, back to Welcome")
+                navController.navigate(Screen.Welcome) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+    }
+
+    // ── Errors ──
     LaunchedEffect(authState.error) {
         authState.error?.let { error ->
             Log.e(TAG, "Auth error: $error")
@@ -121,7 +163,7 @@ fun VexiumNavHost(
             Log.d(TAG, "Google result: $result")
             when (result) {
                 is NativeSignInResult.Success -> {
-                    Toast.makeText(context, "Signed in!", Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, "✅ Google success!")
                 }
                 is NativeSignInResult.ClosedByUser -> {
                     Toast.makeText(context, "Sign in cancelled", Toast.LENGTH_SHORT).show()
@@ -139,7 +181,7 @@ fun VexiumNavHost(
     // ── Username bottom sheet ──
     if (showUsernameSheet) {
         UsernameSheet(
-            onDismiss = { showUsernameSheet = false },
+            onDismiss = { /* don't dismiss on outside tap */ },
             onSkip = {
                 showUsernameSheet = false
                 authViewModel.skipUsername()
@@ -151,22 +193,66 @@ fun VexiumNavHost(
         )
     }
 
+    // ── Biometric setup overlay ──
+    if (showBiometricSetup) {
+        val activity = context as? FragmentActivity
+        val canBiometric = activity != null && BiometricHelper.canAuthenticate(context)
+
+        if (canBiometric) {
+            BiometricSetupScreen(
+                onEnable = {
+                    authViewModel.enableBiometric()
+                    if (activity != null) {
+                        BiometricHelper.authenticate(
+                            activity = activity,
+                            title = "Enable Biometrics",
+                            subtitle = "Verify to enable biometric login",
+                            onSuccess = {
+                                showBiometricSetup = false
+                                authViewModel.onBiometricSuccess()
+                            },
+                            onError = {
+                                showBiometricSetup = false
+                                authViewModel.skipBiometric()
+                            },
+                            onCancel = {
+                                showBiometricSetup = false
+                                authViewModel.skipBiometric()
+                            },
+                        )
+                    }
+                },
+                onSkip = {
+                    showBiometricSetup = false
+                    authViewModel.skipBiometric()
+                    // Mark as complete even without biometric
+                    authViewModel.onBiometricSuccess()
+                },
+            )
+        } else {
+            // No biometric hardware — skip
+            showBiometricSetup = false
+            authViewModel.skipBiometric()
+            authViewModel.onBiometricSuccess()
+        }
+    }
+
     // ── Bottom bar ──
-    val currentRoute: Screen? = when (navBackStackEntry?.destination?.route) {
-        Screen.Home::class.qualifiedName -> Screen.Home
-        Screen.Games::class.qualifiedName -> Screen.Games
-        Screen.Nft::class.qualifiedName -> Screen.Nft
-        Screen.Trade::class.qualifiedName -> Screen.Trade
-        Screen.Profile::class.qualifiedName -> Screen.Profile
+    val currentRouteScreen: Screen? = when {
+        currentRouteName?.contains(Screen.Home::class.qualifiedName ?: "") == true -> Screen.Home
+        currentRouteName?.contains(Screen.Games::class.qualifiedName ?: "") == true -> Screen.Games
+        currentRouteName?.contains(Screen.Nft::class.qualifiedName ?: "") == true -> Screen.Nft
+        currentRouteName?.contains(Screen.Trade::class.qualifiedName ?: "") == true -> Screen.Trade
+        currentRouteName?.contains(Screen.Profile::class.qualifiedName ?: "") == true -> Screen.Profile
         else -> null
     }
-    val showBottomBar = currentRoute != null
+    val showBottomBar = currentRouteScreen != null
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
                 VexiumBottomBar(
-                    currentRoute = currentRoute,
+                    currentRoute = currentRouteScreen,
                     onNavigate = { screen ->
                         navController.navigate(screen) {
                             popUpTo(Screen.Home) { saveState = true }
@@ -183,6 +269,7 @@ fun VexiumNavHost(
             startDestination = Screen.SplashAlt,
             modifier = Modifier.padding(innerPadding),
         ) {
+            // ── Splash ──
             composable<Screen.Splash> {
                 SplashScreen(
                     onSplashFinished = {
@@ -203,6 +290,7 @@ fun VexiumNavHost(
                 )
             }
 
+            // ── Welcome ──
             composable<Screen.Welcome> {
                 WelcomeScreen(
                     onGoogleClick = {
@@ -213,59 +301,32 @@ fun VexiumNavHost(
                     onEmailClick = { },
                     onGuestClick = {
                         navController.navigate(Screen.Home) {
-                            popUpTo(Screen.Welcome) { inclusive = true }
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                 )
             }
 
+            // ── Create PIN ──
             composable<Screen.CreatePin> {
                 PinScreen(
                     mode = PinMode.CREATE,
-                    onPinConfirmed = { pin ->
-                        authViewModel.savePin(pin)
-                    },
+                    onPinConfirmed = { pin -> authViewModel.savePin(pin) },
                     onBackClick = {
-                        navController.popBackStack()
+                        authViewModel.signOut()
+                        navController.navigate(Screen.Welcome) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     },
                 )
-
-                // After PIN saved, show biometric setup
-                if (authState.showBiometricPrompt && !authState.needsPin) {
-                    val activity = context as? FragmentActivity
-                    val canBiometric = activity != null && BiometricHelper.canAuthenticate(context)
-
-                    if (canBiometric) {
-                        BiometricSetupScreen(
-                            onEnable = {
-                                authViewModel.enableBiometric()
-                                if (activity != null) {
-                                    BiometricHelper.authenticate(
-                                        activity = activity,
-                                        title = "Enable Biometrics",
-                                        subtitle = "Verify to enable biometric login",
-                                        onSuccess = { authViewModel.onBiometricSuccess() },
-                                        onError = { authViewModel.skipBiometric() },
-                                        onCancel = { authViewModel.skipBiometric() },
-                                    )
-                                }
-                            },
-                            onSkip = {
-                                authViewModel.skipBiometric()
-                            },
-                        )
-                    }
-                }
             }
 
+            // ── Verify PIN ──
             composable<Screen.VerifyPin> {
                 val activity = context as? FragmentActivity
-
                 PinScreen(
                     mode = PinMode.VERIFY,
-                    onPinConfirmed = { pin ->
-                        authViewModel.verifyPin(pin)
-                    },
+                    onPinConfirmed = { pin -> authViewModel.verifyPin(pin) },
                     onBiometricClick = if (activity != null && BiometricHelper.canAuthenticate(context)) {
                         {
                             BiometricHelper.authenticate(

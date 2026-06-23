@@ -88,14 +88,14 @@ class AuthViewModel @Inject constructor(
         preferencesManager.setHasUsername(hasUsername)
         preferencesManager.setHasPin(hasPin)
 
-        val biometricEnabled = preferencesManager.biometricEnabled.first()
-
         _uiState.value = _uiState.value.copy(
             needsUsername = !hasUsername,
             needsPin = !hasPin,
-            showBiometricPrompt = hasPin && biometricEnabled,
+            showBiometricPrompt = false,
             pinVerified = false,
-            allSetupComplete = hasUsername && hasPin,
+            // NOT complete until PIN is verified (for returning users)
+            // or created (for new users)
+            allSetupComplete = false,
         )
     }
 
@@ -145,12 +145,13 @@ class AuthViewModel @Inject constructor(
                 val userId = authRepository.currentUser()?.id ?: return@launch
                 authRepository.savePin(userId, pin)
                 preferencesManager.setHasPin(true)
+                // PIN saved — now prompt biometric before marking complete
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     needsPin = false,
                     pinVerified = true,
                     showBiometricPrompt = true,
-                    allSetupComplete = true,
+                    allSetupComplete = false, // NOT complete yet — biometric step pending
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
