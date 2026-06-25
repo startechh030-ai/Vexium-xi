@@ -54,6 +54,7 @@ espresso = "3.6.1"
 
 # Core KTX
 coreKtx = "1.18.0"
+appcompat = "1.7.0"
 
 # Splash Screen
 splashscreen = "1.0.1"
@@ -67,6 +68,7 @@ material3 = "1.4.0"
 [libraries]
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 
 # Compose BOM (manages all Compose versions)
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

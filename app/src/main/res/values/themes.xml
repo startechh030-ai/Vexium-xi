@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Vexium" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Vexium" parent="Theme.AppCompat.NoActionBar" />
     <style name="Theme.Vexium.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#000000</item>
+        <item name="windowSplashScreenBackground">#FF000000</item>
         <item name="postSplashScreenTheme">@style/Theme.Vexium</item>
     </style>
 </resources>

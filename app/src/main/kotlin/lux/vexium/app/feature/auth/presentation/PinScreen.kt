@@ -2,6 +2,7 @@ package lux.vexium.app.feature.auth.presentation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,8 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,211 +49,271 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import lux.vexium.app.R
 
-enum class PinMode {
-    CREATE,     // First time — enter new PIN
-    CONFIRM,    // Re-enter to confirm
-    VERIFY,     // Returning user — enter existing PIN
-}
+enum class PinMode { CREATE, CONFIRM, VERIFY }
 
 @Composable
 fun PinScreen(
     mode: PinMode,
+    userName: String? = null,
+    userInitials: String? = null,
     onPinConfirmed: (String) -> Unit,
     onBiometricClick: (() -> Unit)? = null,
     onBackClick: () -> Unit = {},
+    onLogout: (() -> Unit)? = null,
 ) {
     val isDark = isSystemInDarkTheme()
+    val accentColor = if (isDark) Color(0xFF5EB0EF) else Color(0xFF2A6FAC)
 
     var pin by remember { mutableStateOf("") }
     var firstPin by remember { mutableStateOf("") }
     var currentMode by remember { mutableStateOf(mode) }
     var error by remember { mutableStateOf<String?>(null) }
-    var shake by remember { mutableStateOf(false) }
 
     val title = when (currentMode) {
         PinMode.CREATE -> "Create your PIN"
         PinMode.CONFIRM -> "Confirm your PIN"
-        PinMode.VERIFY -> "Enter your PIN"
+        PinMode.VERIFY -> if (userName != null) "Welcome Back" else "Enter your PIN"
     }
 
     val subtitle = when (currentMode) {
         PinMode.CREATE -> "Choose a 6-digit security code"
-        PinMode.CONFIRM -> "Re-enter your code to confirm"
-        PinMode.VERIFY -> "Enter your 6-digit code to continue"
+        PinMode.CONFIRM -> "Re-enter to confirm"
+        PinMode.VERIFY -> "Enter your 6-digit PIN"
     }
 
-    // Handle PIN completion
     LaunchedEffect(pin) {
         if (pin.length == 6) {
-            delay(200) // Brief pause for visual feedback
-
+            delay(200)
             when (currentMode) {
                 PinMode.CREATE -> {
-                    firstPin = pin
-                    pin = ""
-                    currentMode = PinMode.CONFIRM
-                    error = null
+                    firstPin = pin; pin = ""; currentMode = PinMode.CONFIRM; error = null
                 }
                 PinMode.CONFIRM -> {
                     if (pin == firstPin) {
                         onPinConfirmed(pin)
                     } else {
-                        error = "PINs don't match. Try again."
-                        shake = true
-                        pin = ""
-                        currentMode = PinMode.CREATE
-                        firstPin = ""
+                        error = "PINs don't match"; pin = ""; currentMode = PinMode.CREATE; firstPin = ""
                         delay(500)
-                        shake = false
                     }
                 }
-                PinMode.VERIFY -> {
-                    onPinConfirmed(pin)
-                }
+                PinMode.VERIFY -> onPinConfirmed(pin)
             }
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                if (isDark) {
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Black, Color(0xFF0A0A0A), Color(0xFF080808)),
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0xFFF2F6FA), Color(0xFFE8F0F6), Color(0xFFF2F6FA)),
-                    )
-                },
-            ),
-    ) {
-        // Back button
-        Icon(
-            painter = painterResource(id = R.drawable.ic_back),
-            contentDescription = "Back",
-            modifier = Modifier
-                .padding(start = 16.dp, top = 48.dp)
-                .size(28.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onBackClick)
-                .padding(2.dp),
-            tint = if (isDark) Color(0xFF888888) else Color(0xFF666666),
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        // ── Ambient background ──
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width; val h = size.height
+            if (isDark) {
+                // Subtle blue ambient top-right
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF1A3050).copy(alpha = 0.20f), Color.Transparent),
+                        center = Offset(w * 0.8f, h * 0.15f), radius = w * 0.5f,
+                    ),
+                    radius = w * 0.5f, center = Offset(w * 0.8f, h * 0.15f),
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF0D2040).copy(alpha = 0.15f), Color.Transparent),
+                        center = Offset(w * 0.15f, h * 0.85f), radius = w * 0.4f,
+                    ),
+                    radius = w * 0.4f, center = Offset(w * 0.15f, h * 0.85f),
+                )
+            } else {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFD0E8F8).copy(alpha = 0.40f), Color.Transparent),
+                        center = Offset(w * 0.8f, h * 0.12f), radius = w * 0.5f,
+                    ),
+                    radius = w * 0.5f, center = Offset(w * 0.8f, h * 0.12f),
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFD8ECF8).copy(alpha = 0.30f), Color.Transparent),
+                        center = Offset(w * 0.2f, h * 0.8f), radius = w * 0.35f,
+                    ),
+                    radius = w * 0.35f, center = Offset(w * 0.2f, h * 0.8f),
+                )
+            }
+        }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp),
+                .background(if (isDark) Color.Black.copy(alpha = 0.85f) else Color(0xFFF2F6FA).copy(alpha = 0.90f))
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.weight(0.25f))
+            // Back button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 44.dp),
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_back),
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBackClick)
+                        .padding(2.dp),
+                    tint = if (isDark) Color(0xFF666666) else Color(0xFF999999),
+                )
+            }
 
-            // Lock icon
-            Icon(
-                painter = painterResource(id = R.drawable.ic_fingerprint),
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = if (isDark) Color(0xFF5EB0EF) else Color(0xFF2A6FAC),
-            )
+            Spacer(modifier = Modifier.weight(0.15f))
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // Avatar (verify mode only)
+            if (currentMode == PinMode.VERIFY && userInitials != null) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(if (isDark) Color(0xFF1A1A1A) else Color(0xFFE4E8EC))
+                        .border(2.dp, accentColor.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = userInitials,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                // Lock icon for create mode
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_fingerprint),
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = accentColor,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color.White else Color(0xFF111111),
-            )
+            // Title
+            if (currentMode == PinMode.VERIFY && userName != null) {
+                Text(
+                    text = "Welcome Back, ${userName.split(" ").first()}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.White else Color(0xFF111111),
+                )
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.White else Color(0xFF111111),
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isDark) Color(0xFF666666) else Color(0xFF8A9BB0),
-                textAlign = TextAlign.Center,
+                color = accentColor.copy(alpha = 0.7f),
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // PIN dots
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // PIN circles (outlined style like reference)
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 repeat(6) { index ->
-                    PinDot(
-                        filled = index < pin.length,
-                        isDark = isDark,
-                        hasError = error != null,
+                    PinCircle(filled = index < pin.length, isDark = isDark, hasError = error != null, accentColor = accentColor)
+                }
+            }
+
+            if (error != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = error ?: "", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF5555))
+            }
+
+            Spacer(modifier = Modifier.weight(0.2f))
+
+            // Number keyboard
+            NumberKeyboard(
+                onNumberClick = { if (pin.length < 6) { pin += it; error = null } },
+                onDeleteClick = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
+                onBiometricClick = if (currentMode == PinMode.VERIFY) onBiometricClick else null,
+                isDark = isDark,
+                accentColor = accentColor,
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Bottom actions (verify mode)
+            if (currentMode == PinMode.VERIFY && onLogout != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Log out",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = accentColor,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onLogout)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                    Text(
+                        text = "  |  ",
+                        color = if (isDark) Color(0xFF333333) else Color(0xFFCCCCCC),
+                    )
+                    Text(
+                        text = "Forgot PIN? ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isDark) Color(0xFF555555) else Color(0xFF999999),
+                    )
+                    Text(
+                        text = "Reset",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { /* TODO: Reset PIN flow */ }
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
                     )
                 }
             }
 
-            // Error message
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = error ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFFFF4444),
-                textAlign = TextAlign.Center,
-                minLines = 1,
-            )
-
-            Spacer(modifier = Modifier.weight(0.3f))
-
-            // Custom number keyboard
-            NumberKeyboard(
-                onNumberClick = { num ->
-                    if (pin.length < 6) {
-                        pin += num
-                        error = null
-                    }
-                },
-                onDeleteClick = {
-                    if (pin.isNotEmpty()) {
-                        pin = pin.dropLast(1)
-                    }
-                },
-                onBiometricClick = if (currentMode == PinMode.VERIFY) onBiometricClick else null,
-                isDark = isDark,
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun PinDot(filled: Boolean, isDark: Boolean, hasError: Boolean) {
-    val color by animateColorAsState(
+private fun PinCircle(filled: Boolean, isDark: Boolean, hasError: Boolean, accentColor: Color) {
+    val fillColor by animateColorAsState(
         targetValue = when {
-            hasError -> Color(0xFFFF4444)
-            filled && isDark -> Color(0xFF5EB0EF)
-            filled -> Color(0xFF2A6FAC)
-            isDark -> Color(0xFF222222)
-            else -> Color(0xFFDDE2E8)
+            hasError -> Color(0xFFFF5555)
+            filled -> accentColor
+            else -> Color.Transparent
         },
-        animationSpec = tween(150),
-        label = "dot_color",
+        animationSpec = tween(150), label = "fill",
     )
+    val borderColor = when {
+        hasError -> Color(0xFFFF5555)
+        filled -> accentColor
+        isDark -> Color(0xFF333333)
+        else -> Color(0xFFCCD0D6)
+    }
 
     Box(
         modifier = Modifier
-            .size(16.dp)
+            .size(22.dp)
             .clip(CircleShape)
-            .background(color)
-            .then(
-                if (!filled) {
-                    Modifier.border(
-                        1.dp,
-                        if (isDark) Color(0xFF333333) else Color(0xFFCCD0D6),
-                        CircleShape,
-                    )
-                } else Modifier,
-            ),
+            .background(fillColor)
+            .border(1.5.dp, borderColor, CircleShape),
     )
 }
 
@@ -259,68 +323,27 @@ private fun NumberKeyboard(
     onDeleteClick: () -> Unit,
     onBiometricClick: (() -> Unit)?,
     isDark: Boolean,
+    accentColor: Color,
 ) {
-    val numbers = listOf(
-        listOf("1", "2", "3"),
-        listOf("4", "5", "6"),
-        listOf("7", "8", "9"),
-        listOf("bio", "0", "del"),
-    )
+    val rows = listOf(listOf("1","2","3"), listOf("4","5","6"), listOf("7","8","9"), listOf("bio","0","del"))
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        numbers.forEach { row ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 row.forEach { key ->
                     when (key) {
-                        "del" -> {
-                            KeyButton(
-                                isDark = isDark,
-                                onClick = onDeleteClick,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                    contentDescription = "Delete",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (isDark) Color(0xFF888888) else Color(0xFF666666),
-                                )
-                            }
+                        "del" -> KeyBtn(isDark, onClick = onDeleteClick) {
+                            Icon(Icons.AutoMirrored.Filled.Backspace, null, Modifier.size(22.dp), tint = if (isDark) Color(0xFF666666) else Color(0xFF999999))
                         }
-                        "bio" -> {
-                            if (onBiometricClick != null) {
-                                KeyButton(
-                                    isDark = isDark,
-                                    onClick = onBiometricClick,
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_fingerprint),
-                                        contentDescription = "Biometric",
-                                        modifier = Modifier.size(26.dp),
-                                        tint = if (isDark) Color(0xFF5EB0EF) else Color(0xFF2A6FAC),
-                                    )
-                                }
-                            } else {
-                                // Empty space
-                                Spacer(modifier = Modifier.size(72.dp))
+                        "bio" -> if (onBiometricClick != null) {
+                            KeyBtn(isDark, onClick = onBiometricClick) {
+                                Icon(painterResource(R.drawable.ic_fingerprint), null, Modifier.size(24.dp), tint = accentColor)
                             }
+                        } else {
+                            Spacer(modifier = Modifier.size(68.dp))
                         }
-                        else -> {
-                            KeyButton(
-                                isDark = isDark,
-                                onClick = { onNumberClick(key) },
-                            ) {
-                                Text(
-                                    text = key,
-                                    fontSize = 26.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (isDark) Color.White else Color(0xFF111111),
-                                )
-                            }
+                        else -> KeyBtn(isDark, onClick = { onNumberClick(key) }) {
+                            Text(key, fontSize = 24.sp, fontWeight = FontWeight.Medium, color = if (isDark) Color.White else Color(0xFF111111))
                         }
                     }
                 }
@@ -330,23 +353,17 @@ private fun NumberKeyboard(
 }
 
 @Composable
-private fun KeyButton(
-    isDark: Boolean,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit,
-) {
+private fun KeyBtn(isDark: Boolean, onClick: () -> Unit = {}, content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
-            .size(72.dp)
+            .size(68.dp)
             .clip(CircleShape)
-            .background(if (isDark) Color(0xFF0F0F0F) else Color.White.copy(alpha = 0.7f))
+            .background(if (isDark) Color(0xFF0D0D0D) else Color.White.copy(alpha = 0.6f))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true, radius = 36.dp),
+                indication = ripple(bounded = true, radius = 34.dp),
                 onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
-    ) {
-        content()
-    }
+    ) { content() }
 }

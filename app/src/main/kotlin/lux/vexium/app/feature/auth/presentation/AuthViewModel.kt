@@ -19,23 +19,27 @@ import javax.inject.Inject
 private const val TAG = "VexiumAuth"
 
 enum class AuthStep {
-    IDLE,               // Not signed in, nothing happening
+    INITIALIZING,       // App just opened, waiting
+    IDLE,               // Not signed in
     AUTHENTICATING,     // Google sign-in in progress
     CHECKING_PROFILE,   // Fetching profile from Supabase
     USERNAME_PROMPT,    // New user — show username sheet
     CREATE_PIN,         // New user — create 6-digit PIN
     BIOMETRIC_SETUP,    // Prompt to enable biometrics
-    VERIFY_PIN,         // Returning user — enter PIN
-    COMPLETE,           // All done — go to home
+    VERIFY_PIN,         // Returning user with existing session — enter PIN
+    COMPLETE,           // All done — go home
 }
 
 data class AuthUiState(
-    val step: AuthStep = AuthStep.IDLE,
+    val step: AuthStep = AuthStep.INITIALIZING,
     val isLoading: Boolean = false,
     val loadingMessage: String = "Loading...",
     val error: String? = null,
     val isSignedIn: Boolean = false,
-    val isExistingUser: Boolean = false, // user already had account before this sign-in
+    val userName: String? = null,
+    val userInitials: String? = null,
+    val avatarUrl: String? = null,
+    val freshLogin: Boolean = false, // true = user JUST signed in this session (not restored)
 )
 
 @HiltViewModel
@@ -46,6 +50,12 @@ class AuthViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
+
+    // Track if splash is done — don't navigate until splash finishes
+    private var splashCompleted = false
+
+    // Track if this is a fresh sign-in vs restored session
+    private var isFreshSignIn = false
 
     val sessionStatus: StateFlow<SessionStatus> = authRepository.sessionStatus
         .stateIn(
@@ -58,45 +68,62 @@ class AuthViewModel @Inject constructor(
         observeSession()
     }
 
+    fun onSplashCompleted() {
+        splashCompleted = true
+        // If auth state was already determined, process it now
+        if (_uiState.value.step == AuthStep.INITIALIZING && _uiState.value.isSignedIn) {
+            viewModelScope.launch {
+                val userId = authRepository.currentUser()?.id ?: return@launch
+                processAuthenticatedUser(userId)
+            }
+        } else if (_uiState.value.step == AuthStep.INITIALIZING) {
+            _uiState.value = _uiState.value.copy(step = AuthStep.IDLE)
+        }
+    }
+
     private fun observeSession() {
         viewModelScope.launch {
             authRepository.sessionStatus.collect { status ->
-                Log.d(TAG, "Session: $status")
+                Log.d(TAG, "Session: $status, splashDone=$splashCompleted, freshLogin=$isFreshSignIn")
                 when (status) {
                     is SessionStatus.Authenticated -> {
                         val user = authRepository.currentUser() ?: return@collect
                         preferencesManager.saveUserId(user.id)
 
-                        _uiState.value = _uiState.value.copy(
-                            isSignedIn = true,
-                            isLoading = true,
-                            loadingMessage = "Setting up...",
-                            step = AuthStep.CHECKING_PROFILE,
-                        )
+                        _uiState.value = _uiState.value.copy(isSignedIn = true)
 
-                        checkUserSetup(user.id)
+                        if (splashCompleted) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = true,
+                                loadingMessage = "Setting up...",
+                                step = AuthStep.CHECKING_PROFILE,
+                            )
+                            processAuthenticatedUser(user.id)
+                        }
+                        // If splash not done yet, onSplashCompleted will handle it
                     }
                     is SessionStatus.NotAuthenticated -> {
-                        // Only reset if we were previously signed in
-                        // Don't show "session expired" on cold start
-                        if (_uiState.value.isSignedIn) {
+                        if (splashCompleted) {
                             _uiState.value = AuthUiState(step = AuthStep.IDLE)
+                        } else {
+                            _uiState.value = AuthUiState(step = AuthStep.INITIALIZING)
                         }
+                        isFreshSignIn = false
                     }
                     is SessionStatus.Initializing -> {
-                        // Silent — don't show loading on cold start
+                        // Silent
                     }
                     is SessionStatus.RefreshFailure -> {
-                        // Silent — don't toast "session expired"
-                        // Just reset to not signed in
-                        _uiState.value = AuthUiState(step = AuthStep.IDLE)
+                        if (splashCompleted) {
+                            _uiState.value = AuthUiState(step = AuthStep.IDLE)
+                        }
                     }
                 }
             }
         }
     }
 
-    private suspend fun checkUserSetup(userId: String) {
+    private suspend fun processAuthenticatedUser(userId: String) {
         try {
             val profile = authRepository.getProfile(userId)
             val hasUsername = profile?.username != null
@@ -105,91 +132,95 @@ class AuthViewModel @Inject constructor(
             preferencesManager.setHasUsername(hasUsername)
             preferencesManager.setHasPin(hasPin)
 
-            Log.d(TAG, "Profile: username=$hasUsername, pin=$hasPin")
+            val displayName = profile?.fullName ?: profile?.username ?: "User"
+            val initials = displayName.split(" ")
+                .take(2)
+                .mapNotNull { it.firstOrNull()?.uppercase() }
+                .joinToString("")
+                .ifEmpty { "U" }
+
+            Log.d(TAG, "Profile: username=$hasUsername, pin=$hasPin, fresh=$isFreshSignIn")
 
             val nextStep = when {
-                // Existing user with everything set — verify PIN
-                hasUsername && hasPin -> {
-                    _uiState.value = _uiState.value.copy(isExistingUser = true)
-                    AuthStep.VERIFY_PIN
+                // Fresh login (user just tapped Google) + existing account → skip everything
+                isFreshSignIn && hasPin -> {
+                    isFreshSignIn = false
+                    AuthStep.COMPLETE
                 }
-                // Has account but no username yet
-                !hasUsername -> AuthStep.USERNAME_PROMPT
-                // Has username but no PIN
+                // New user — needs username
+                !hasUsername && isFreshSignIn -> AuthStep.USERNAME_PROMPT
+                // Needs PIN creation
                 !hasPin -> AuthStep.CREATE_PIN
+                // Restored session (app reopened) — verify PIN
+                hasPin && !isFreshSignIn -> AuthStep.VERIFY_PIN
+                // Fallback
                 else -> AuthStep.COMPLETE
             }
 
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 step = nextStep,
+                userName = displayName,
+                userInitials = initials,
+                avatarUrl = profile?.avatarUrl,
+                freshLogin = isFreshSignIn,
             )
         } catch (e: Exception) {
             Log.e(TAG, "Profile check failed: ${e.message}")
-            // If profile check fails (maybe table not set up), go to username
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
-                step = AuthStep.USERNAME_PROMPT,
+                step = if (isFreshSignIn) AuthStep.USERNAME_PROMPT else AuthStep.COMPLETE,
             )
         }
     }
 
     fun onGoogleSignInStarted() {
+        isFreshSignIn = true
         _uiState.value = _uiState.value.copy(
             isLoading = true,
             loadingMessage = "Signing in...",
             step = AuthStep.AUTHENTICATING,
+            freshLogin = true,
         )
     }
 
     fun onGoogleSignInFailed(message: String) {
+        isFreshSignIn = false
         _uiState.value = _uiState.value.copy(
             isLoading = false,
             step = AuthStep.IDLE,
             error = message,
+            freshLogin = false,
         )
     }
 
     fun onGoogleSignInCancelled() {
+        isFreshSignIn = false
         _uiState.value = _uiState.value.copy(
             isLoading = false,
             step = AuthStep.IDLE,
+            freshLogin = false,
         )
     }
 
     fun saveUsername(username: String, referralCode: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                loadingMessage = "Saving profile...",
-            )
+            _uiState.value = _uiState.value.copy(isLoading = true, loadingMessage = "Saving profile...")
             try {
                 val userId = authRepository.currentUser()?.id ?: return@launch
-
                 var referredBy: String? = null
                 if (referralCode.isNotBlank()) {
                     val referrer = authRepository.findUserByReferralCode(referralCode)
                     referredBy = referrer?.id
                 }
-
-                authRepository.updateProfile(
-                    userId = userId,
-                    update = ProfileUpdate(
-                        username = username.ifBlank { null },
-                        referredBy = referredBy,
-                    ),
-                )
-
+                authRepository.updateProfile(userId, ProfileUpdate(
+                    username = username.ifBlank { null },
+                    referredBy = referredBy,
+                ))
                 preferencesManager.setHasUsername(true)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    step = AuthStep.CREATE_PIN,
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, step = AuthStep.CREATE_PIN)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to save",
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
@@ -200,23 +231,14 @@ class AuthViewModel @Inject constructor(
 
     fun savePin(pin: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                loadingMessage = "Securing your account...",
-            )
+            _uiState.value = _uiState.value.copy(isLoading = true, loadingMessage = "Securing account...")
             try {
                 val userId = authRepository.currentUser()?.id ?: return@launch
                 authRepository.savePin(userId, pin)
                 preferencesManager.setHasPin(true)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    step = AuthStep.BIOMETRIC_SETUP,
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, step = AuthStep.BIOMETRIC_SETUP)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to save PIN",
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
@@ -226,23 +248,13 @@ class AuthViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, loadingMessage = "Verifying...")
             try {
                 val userId = authRepository.currentUser()?.id ?: return@launch
-                val valid = authRepository.verifyPin(userId, pin)
-                if (valid) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        step = AuthStep.COMPLETE,
-                    )
+                if (authRepository.verifyPin(userId, pin)) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, step = AuthStep.COMPLETE)
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Incorrect PIN",
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = "Incorrect PIN")
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Verification failed",
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, error = "Verification failed")
             }
         }
     }
@@ -252,9 +264,7 @@ class AuthViewModel @Inject constructor(
     }
 
     fun enableBiometric() {
-        viewModelScope.launch {
-            preferencesManager.setBiometricEnabled(true)
-        }
+        viewModelScope.launch { preferencesManager.setBiometricEnabled(true) }
     }
 
     fun skipBiometric() {
@@ -268,6 +278,7 @@ class AuthViewModel @Inject constructor(
                 authRepository.signOut()
                 preferencesManager.clearAll()
             } catch (_: Exception) { }
+            isFreshSignIn = false
             _uiState.value = AuthUiState(step = AuthStep.IDLE)
         }
     }
