@@ -28,14 +28,17 @@
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M17,21L19,21C20.1,21 21,20.1 21,19L21,17" />
-    <!-- Left eye -->
-    <path
+    <!-- Eyes -->
+    <circle
         android:fillColor="#FFFFFF"
-        android:pathData="M9,10 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
-    <!-- Right eye -->
-    <path
+        android:cx="9"
+        android:cy="10"
+        android:r="1" />
+    <circle
         android:fillColor="#FFFFFF"
-        android:pathData="M15,10 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+        android:cx="15"
+        android:cy="10"
+        android:r="1" />
     <!-- Smile -->
     <path
         android:strokeColor="#FFFFFF"

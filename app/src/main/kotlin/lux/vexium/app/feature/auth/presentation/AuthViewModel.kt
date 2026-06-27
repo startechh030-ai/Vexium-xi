@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lux.vexium.app.data.local.PreferencesManager
@@ -19,15 +20,16 @@ import javax.inject.Inject
 private const val TAG = "VexiumAuth"
 
 enum class AuthStep {
-    INITIALIZING,       // App just opened, waiting
-    IDLE,               // Not signed in
-    AUTHENTICATING,     // Google sign-in in progress
-    CHECKING_PROFILE,   // Fetching profile from Supabase
-    USERNAME_PROMPT,    // New user — show username sheet
-    CREATE_PIN,         // New user — create 6-digit PIN
-    BIOMETRIC_SETUP,    // Prompt to enable biometrics
-    VERIFY_PIN,         // Returning user with existing session — enter PIN
-    COMPLETE,           // All done — go home
+    INITIALIZING,
+    IDLE,
+    AUTHENTICATING,
+    CHECKING_PROFILE,
+    USERNAME_PROMPT,
+    CREATE_PIN,
+    BIOMETRIC_SETUP,
+    VERIFY_PIN,
+    ACCOUNT_CREATED,
+    COMPLETE,
 }
 
 data class AuthUiState(
@@ -39,8 +41,17 @@ data class AuthUiState(
     val userName: String? = null,
     val userInitials: String? = null,
     val avatarUrl: String? = null,
-    val freshLogin: Boolean = false, // true = user JUST signed in this session (not restored)
+    val freshLogin: Boolean = false,
+    val isNewUser: Boolean = false,
+    // Where to go after splash: null = still determining
+    val postSplashDestination: PostSplashDestination? = null,
 )
+
+enum class PostSplashDestination {
+    WELCOME,    // Not signed in → show welcome
+    VERIFY_PIN, // Signed in, has PIN → verify
+    HOME,       // Signed in, fresh login, existing user → straight home
+}
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -51,11 +62,8 @@ class AuthViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    // Track if splash is done — don't navigate until splash finishes
-    private var splashCompleted = false
-
-    // Track if this is a fresh sign-in vs restored session
     private var isFreshSignIn = false
+    private var sessionResolved = false
 
     val sessionStatus: StateFlow<SessionStatus> = authRepository.sessionStatus
         .stateIn(
@@ -68,23 +76,10 @@ class AuthViewModel @Inject constructor(
         observeSession()
     }
 
-    fun onSplashCompleted() {
-        splashCompleted = true
-        // If auth state was already determined, process it now
-        if (_uiState.value.step == AuthStep.INITIALIZING && _uiState.value.isSignedIn) {
-            viewModelScope.launch {
-                val userId = authRepository.currentUser()?.id ?: return@launch
-                processAuthenticatedUser(userId)
-            }
-        } else if (_uiState.value.step == AuthStep.INITIALIZING) {
-            _uiState.value = _uiState.value.copy(step = AuthStep.IDLE)
-        }
-    }
-
     private fun observeSession() {
         viewModelScope.launch {
             authRepository.sessionStatus.collect { status ->
-                Log.d(TAG, "Session: $status, splashDone=$splashCompleted, freshLogin=$isFreshSignIn")
+                Log.d(TAG, "Session: $status")
                 when (status) {
                     is SessionStatus.Authenticated -> {
                         val user = authRepository.currentUser() ?: return@collect
@@ -92,7 +87,12 @@ class AuthViewModel @Inject constructor(
 
                         _uiState.value = _uiState.value.copy(isSignedIn = true)
 
-                        if (splashCompleted) {
+                        if (!sessionResolved) {
+                            // First time session resolved (during splash)
+                            sessionResolved = true
+                            determineSplashDestination(user.id)
+                        } else if (isFreshSignIn) {
+                            // User just signed in via Google
                             _uiState.value = _uiState.value.copy(
                                 isLoading = true,
                                 loadingMessage = "Setting up...",
@@ -100,29 +100,80 @@ class AuthViewModel @Inject constructor(
                             )
                             processAuthenticatedUser(user.id)
                         }
-                        // If splash not done yet, onSplashCompleted will handle it
                     }
                     is SessionStatus.NotAuthenticated -> {
-                        if (splashCompleted) {
-                            _uiState.value = AuthUiState(step = AuthStep.IDLE)
-                        } else {
-                            _uiState.value = AuthUiState(step = AuthStep.INITIALIZING)
-                        }
+                        sessionResolved = true
                         isFreshSignIn = false
+                        _uiState.value = _uiState.value.copy(
+                            isSignedIn = false,
+                            step = if (_uiState.value.step == AuthStep.INITIALIZING) AuthStep.INITIALIZING else AuthStep.IDLE,
+                            postSplashDestination = PostSplashDestination.WELCOME,
+                        )
                     }
-                    is SessionStatus.Initializing -> {
-                        // Silent
-                    }
+                    is SessionStatus.Initializing -> { /* wait */ }
                     is SessionStatus.RefreshFailure -> {
-                        if (splashCompleted) {
-                            _uiState.value = AuthUiState(step = AuthStep.IDLE)
-                        }
+                        sessionResolved = true
+                        _uiState.value = _uiState.value.copy(
+                            isSignedIn = false,
+                            postSplashDestination = PostSplashDestination.WELCOME,
+                        )
                     }
                 }
             }
         }
     }
 
+    /**
+     * Called DURING splash to determine where to go after.
+     * This way splash shows until we know exactly where to navigate.
+     */
+    private suspend fun determineSplashDestination(userId: String) {
+        try {
+            val profile = authRepository.getProfile(userId)
+            val hasPin = profile?.quickLoginPinHash != null
+
+            val displayName = profile?.fullName ?: profile?.username ?: "User"
+            val initials = displayName.split(" ")
+                .take(2).mapNotNull { it.firstOrNull()?.uppercase() }
+                .joinToString("").ifEmpty { "U" }
+
+            if (hasPin) {
+                _uiState.value = _uiState.value.copy(
+                    postSplashDestination = PostSplashDestination.VERIFY_PIN,
+                    userName = displayName,
+                    userInitials = initials,
+                    avatarUrl = profile?.avatarUrl,
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    postSplashDestination = PostSplashDestination.WELCOME,
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Splash destination check failed: ${e.message}")
+            _uiState.value = _uiState.value.copy(
+                postSplashDestination = PostSplashDestination.WELCOME,
+            )
+        }
+    }
+
+    /**
+     * Called when splash animation completes.
+     * Uses the pre-determined destination.
+     */
+    fun onSplashCompleted(): PostSplashDestination {
+        val dest = _uiState.value.postSplashDestination
+        if (dest == PostSplashDestination.VERIFY_PIN) {
+            _uiState.value = _uiState.value.copy(step = AuthStep.VERIFY_PIN)
+        } else {
+            _uiState.value = _uiState.value.copy(step = AuthStep.IDLE)
+        }
+        return dest ?: PostSplashDestination.WELCOME
+    }
+
+    /**
+     * Process after fresh Google sign-in
+     */
     private suspend fun processAuthenticatedUser(userId: String) {
         try {
             val profile = authRepository.getProfile(userId)
@@ -134,26 +185,24 @@ class AuthViewModel @Inject constructor(
 
             val displayName = profile?.fullName ?: profile?.username ?: "User"
             val initials = displayName.split(" ")
-                .take(2)
-                .mapNotNull { it.firstOrNull()?.uppercase() }
-                .joinToString("")
-                .ifEmpty { "U" }
+                .take(2).mapNotNull { it.firstOrNull()?.uppercase() }
+                .joinToString("").ifEmpty { "U" }
 
-            Log.d(TAG, "Profile: username=$hasUsername, pin=$hasPin, fresh=$isFreshSignIn")
+            Log.d(TAG, "Profile: user=$hasUsername pin=$hasPin fresh=$isFreshSignIn")
 
             val nextStep = when {
-                // Fresh login (user just tapped Google) + existing account → skip everything
+                // Existing user with PIN → skip everything, straight home
                 isFreshSignIn && hasPin -> {
                     isFreshSignIn = false
                     AuthStep.COMPLETE
                 }
-                // New user — needs username
-                !hasUsername && isFreshSignIn -> AuthStep.USERNAME_PROMPT
-                // Needs PIN creation
+                // New user → username
+                !hasUsername && isFreshSignIn -> {
+                    _uiState.value = _uiState.value.copy(isNewUser = true)
+                    AuthStep.USERNAME_PROMPT
+                }
+                // Has username but no PIN
                 !hasPin -> AuthStep.CREATE_PIN
-                // Restored session (app reopened) — verify PIN
-                hasPin && !isFreshSignIn -> AuthStep.VERIFY_PIN
-                // Fallback
                 else -> AuthStep.COMPLETE
             }
 
@@ -166,10 +215,11 @@ class AuthViewModel @Inject constructor(
                 freshLogin = isFreshSignIn,
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Profile check failed: ${e.message}")
+            Log.e(TAG, "Process user failed: ${e.message}")
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 step = if (isFreshSignIn) AuthStep.USERNAME_PROMPT else AuthStep.COMPLETE,
+                isNewUser = isFreshSignIn,
             )
         }
     }
@@ -187,19 +237,14 @@ class AuthViewModel @Inject constructor(
     fun onGoogleSignInFailed(message: String) {
         isFreshSignIn = false
         _uiState.value = _uiState.value.copy(
-            isLoading = false,
-            step = AuthStep.IDLE,
-            error = message,
-            freshLogin = false,
+            isLoading = false, step = AuthStep.IDLE, error = message, freshLogin = false,
         )
     }
 
     fun onGoogleSignInCancelled() {
         isFreshSignIn = false
         _uiState.value = _uiState.value.copy(
-            isLoading = false,
-            step = AuthStep.IDLE,
-            freshLogin = false,
+            isLoading = false, step = AuthStep.IDLE, freshLogin = false,
         )
     }
 
@@ -214,8 +259,7 @@ class AuthViewModel @Inject constructor(
                     referredBy = referrer?.id
                 }
                 authRepository.updateProfile(userId, ProfileUpdate(
-                    username = username.ifBlank { null },
-                    referredBy = referredBy,
+                    username = username.ifBlank { null }, referredBy = referredBy,
                 ))
                 preferencesManager.setHasUsername(true)
                 _uiState.value = _uiState.value.copy(isLoading = false, step = AuthStep.CREATE_PIN)
@@ -268,7 +312,16 @@ class AuthViewModel @Inject constructor(
     }
 
     fun skipBiometric() {
-        _uiState.value = _uiState.value.copy(step = AuthStep.COMPLETE)
+        // If new user, show account created screen. Otherwise straight home.
+        if (_uiState.value.isNewUser) {
+            _uiState.value = _uiState.value.copy(step = AuthStep.ACCOUNT_CREATED)
+        } else {
+            _uiState.value = _uiState.value.copy(step = AuthStep.COMPLETE)
+        }
+    }
+
+    fun onAccountCreatedContinue() {
+        _uiState.value = _uiState.value.copy(step = AuthStep.COMPLETE, isNewUser = false)
     }
 
     fun signOut() {
@@ -279,7 +332,8 @@ class AuthViewModel @Inject constructor(
                 preferencesManager.clearAll()
             } catch (_: Exception) { }
             isFreshSignIn = false
-            _uiState.value = AuthUiState(step = AuthStep.IDLE)
+            sessionResolved = false
+            _uiState.value = AuthUiState(step = AuthStep.IDLE, postSplashDestination = PostSplashDestination.WELCOME)
         }
     }
 

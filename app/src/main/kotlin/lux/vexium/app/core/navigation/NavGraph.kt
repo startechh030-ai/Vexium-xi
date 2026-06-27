@@ -25,12 +25,14 @@ import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
 import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
 import lux.vexium.app.core.components.FullScreenLoading
 import lux.vexium.app.core.components.ModalLoading
+import lux.vexium.app.feature.auth.presentation.AccountCreatedScreen
 import lux.vexium.app.feature.auth.presentation.AuthStep
 import lux.vexium.app.feature.auth.presentation.AuthViewModel
 import lux.vexium.app.feature.auth.presentation.BiometricHelper
 import lux.vexium.app.feature.auth.presentation.BiometricSetupScreen
 import lux.vexium.app.feature.auth.presentation.PinMode
 import lux.vexium.app.feature.auth.presentation.PinScreen
+import lux.vexium.app.feature.auth.presentation.PostSplashDestination
 import lux.vexium.app.feature.auth.presentation.UsernameSheet
 import lux.vexium.app.feature.games.presentation.GamesScreen
 import lux.vexium.app.feature.home.presentation.HomeScreen
@@ -63,42 +65,46 @@ fun VexiumNavHost(
 
     // ════════════════════════════
     // STEP-DRIVEN NAVIGATION
+    // Only triggers on steps that need navigation
     // ════════════════════════════
     LaunchedEffect(authState.step) {
         Log.d(TAG, "Step: ${authState.step}")
-
         when (authState.step) {
-            AuthStep.INITIALIZING -> { /* Wait for splash */ }
-            AuthStep.IDLE -> { /* On welcome screen already */ }
-            AuthStep.AUTHENTICATING -> { /* Loading overlay shown */ }
-            AuthStep.CHECKING_PROFILE -> { /* Loading overlay shown */ }
-
-            AuthStep.USERNAME_PROMPT -> {
-                showUsernameSheet = true
-            }
+            AuthStep.USERNAME_PROMPT -> showUsernameSheet = true
 
             AuthStep.CREATE_PIN -> {
                 showUsernameSheet = false
-                navController.navigate(Screen.CreatePin) {
-                    popUpTo(0) { inclusive = true }
-                }
+                navController.navigate(Screen.CreatePin) { popUpTo(0) { inclusive = true } }
             }
-
-            AuthStep.BIOMETRIC_SETUP -> { /* Overlay shown */ }
 
             AuthStep.VERIFY_PIN -> {
                 showUsernameSheet = false
-                navController.navigate(Screen.VerifyPin) {
-                    popUpTo(0) { inclusive = true }
+                // Only navigate if not already on VerifyPin
+                val onPin = currentRouteName?.contains(Screen.VerifyPin::class.qualifiedName ?: "") == true
+                if (!onPin) {
+                    navController.navigate(Screen.VerifyPin) { popUpTo(0) { inclusive = true } }
                 }
+            }
+
+            AuthStep.ACCOUNT_CREATED -> {
+                navController.navigate(Screen.AccountCreated) { popUpTo(0) { inclusive = true } }
             }
 
             AuthStep.COMPLETE -> {
                 showUsernameSheet = false
-                navController.navigate(Screen.Home) {
-                    popUpTo(0) { inclusive = true }
+                navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } }
+            }
+
+            AuthStep.IDLE -> {
+                // Make sure we're on welcome
+                val onWelcome = currentRouteName?.contains(Screen.Welcome::class.qualifiedName ?: "") == true
+                val onSplash = currentRouteName?.contains("Splash") == true
+                if (!onWelcome && !onSplash) {
+                    navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
                 }
             }
+
+            else -> { /* INITIALIZING, AUTHENTICATING, CHECKING_PROFILE, BIOMETRIC_SETUP — handled by overlays */ }
         }
     }
 
@@ -126,14 +132,8 @@ fun VexiumNavHost(
     if (showUsernameSheet && authState.step == AuthStep.USERNAME_PROMPT) {
         UsernameSheet(
             onDismiss = { },
-            onSkip = {
-                showUsernameSheet = false
-                authViewModel.skipUsername()
-            },
-            onContinue = { username, referral ->
-                showUsernameSheet = false
-                authViewModel.saveUsername(username, referral)
-            },
+            onSkip = { showUsernameSheet = false; authViewModel.skipUsername() },
+            onContinue = { u, r -> showUsernameSheet = false; authViewModel.saveUsername(u, r) },
         )
     }
 
@@ -156,8 +156,7 @@ fun VexiumNavHost(
                         onNavigate = { screen ->
                             navController.navigate(screen) {
                                 popUpTo(Screen.Home) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                                launchSingleTop = true; restoreState = true
                             }
                         },
                     )
@@ -170,40 +169,37 @@ fun VexiumNavHost(
                 modifier = Modifier.padding(innerPadding),
             ) {
                 composable<Screen.Splash> {
-                    SplashScreen(
-                        onSplashFinished = {
-                            authViewModel.onSplashCompleted()
-                            navController.navigate(Screen.Welcome) {
-                                popUpTo(Screen.Splash) { inclusive = true }
-                            }
-                        },
-                    )
+                    SplashScreen(onSplashFinished = {
+                        val dest = authViewModel.onSplashCompleted()
+                        navigateAfterSplash(navController, dest)
+                    })
                 }
 
                 composable<Screen.SplashAlt> {
-                    SplashScreenAlt(
-                        onSplashFinished = {
+                    // Wait for auth to resolve before finishing splash
+                    val postDest = authState.postSplashDestination
+
+                    SplashScreenAlt(onSplashFinished = {
+                        if (postDest != null) {
                             authViewModel.onSplashCompleted()
+                            navigateAfterSplash(navController, postDest)
+                        } else {
+                            // Auth still resolving — show loading then navigate
+                            authViewModel.onSplashCompleted()
+                            // Default to welcome, the LaunchedEffect will redirect if needed
                             navController.navigate(Screen.Welcome) {
                                 popUpTo(Screen.SplashAlt) { inclusive = true }
                             }
-                        },
-                    )
+                        }
+                    })
                 }
 
                 composable<Screen.Welcome> {
                     WelcomeScreen(
-                        onGoogleClick = {
-                            authViewModel.onGoogleSignInStarted()
-                            googleSignInState.startFlow()
-                        },
+                        onGoogleClick = { authViewModel.onGoogleSignInStarted(); googleSignInState.startFlow() },
                         onTelegramClick = { },
                         onEmailClick = { },
-                        onGuestClick = {
-                            navController.navigate(Screen.Home) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
+                        onGuestClick = { navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } } },
                     )
                 }
 
@@ -211,10 +207,7 @@ fun VexiumNavHost(
                     PinScreen(
                         mode = PinMode.CREATE,
                         onPinConfirmed = { authViewModel.savePin(it) },
-                        onBackClick = {
-                            authViewModel.signOut()
-                            navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
-                        },
+                        onBackClick = { authViewModel.signOut() },
                     )
                 }
 
@@ -233,53 +226,40 @@ fun VexiumNavHost(
                                 )
                             }
                         } else null,
-                        onBackClick = {
-                            authViewModel.signOut()
-                            navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
-                        },
-                        onLogout = {
-                            authViewModel.signOut()
-                            navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
-                        },
+                        onBackClick = { authViewModel.signOut() },
+                        onLogout = { authViewModel.signOut() },
                     )
+                }
+
+                composable<Screen.AccountCreated> {
+                    AccountCreatedScreen(onContinue = { authViewModel.onAccountCreatedContinue() })
                 }
 
                 composable<Screen.Home> {
                     HomeScreen(
                         onNavigateToGames = { navController.navigate(Screen.Games) },
                         onNavigateToWallet = { },
-                        onLogout = {
-                            authViewModel.signOut()
-                            navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
-                        },
+                        onLogout = { authViewModel.signOut() },
                     )
                 }
 
-                composable<Screen.Games> {
-                    GamesScreen(onNavigateToGameDetail = { navController.navigate(Screen.GameDetail(it)) })
-                }
+                composable<Screen.Games> { GamesScreen(onNavigateToGameDetail = { navController.navigate(Screen.GameDetail(it)) }) }
                 composable<Screen.Nft> { NftScreen() }
                 composable<Screen.Trade> { TradeScreen() }
                 composable<Screen.Profile> { ProfileScreen() }
-                composable<Screen.Settings> {
-                    GeneralSettingsScreen(settingsViewModel = settingsViewModel, onNavigateBack = { navController.popBackStack() })
-                }
+                composable<Screen.Settings> { GeneralSettingsScreen(settingsViewModel, onNavigateBack = { navController.popBackStack() }) }
             }
         }
 
         // ═══ OVERLAYS ═══
-
-        // Full-screen loading (auth transitions)
         if (authState.isLoading && authState.step in listOf(AuthStep.AUTHENTICATING, AuthStep.CHECKING_PROFILE)) {
             FullScreenLoading(message = authState.loadingMessage)
         }
 
-        // Modal loading (in-app saves)
         if (authState.isLoading && authState.step !in listOf(AuthStep.AUTHENTICATING, AuthStep.CHECKING_PROFILE, AuthStep.INITIALIZING)) {
             ModalLoading(message = authState.loadingMessage)
         }
 
-        // Biometric setup
         if (authState.step == AuthStep.BIOMETRIC_SETUP) {
             val canBiometric = activity != null && BiometricHelper.canAuthenticate(context)
             if (canBiometric) {
@@ -288,8 +268,7 @@ fun VexiumNavHost(
                         authViewModel.enableBiometric()
                         BiometricHelper.authenticate(
                             activity = activity!!,
-                            title = "Enable Biometrics",
-                            subtitle = "Verify to enable",
+                            title = "Enable Biometrics", subtitle = "Verify to enable",
                             onSuccess = { authViewModel.onBiometricSuccess() },
                             onError = { authViewModel.skipBiometric() },
                             onCancel = { authViewModel.skipBiometric() },
@@ -301,5 +280,19 @@ fun VexiumNavHost(
                 LaunchedEffect(Unit) { authViewModel.skipBiometric() }
             }
         }
+    }
+}
+
+private fun navigateAfterSplash(
+    navController: androidx.navigation.NavController,
+    destination: PostSplashDestination,
+) {
+    val screen: Screen = when (destination) {
+        PostSplashDestination.WELCOME -> Screen.Welcome
+        PostSplashDestination.VERIFY_PIN -> Screen.VerifyPin
+        PostSplashDestination.HOME -> Screen.Home
+    }
+    navController.navigate(screen) {
+        popUpTo(0) { inclusive = true }
     }
 }
