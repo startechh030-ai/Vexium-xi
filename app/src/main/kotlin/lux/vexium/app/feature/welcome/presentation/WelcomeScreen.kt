@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import lux.vexium.app.R
 import lux.vexium.app.core.components.VexiumLogo
+import kotlin.random.Random
 
 @Composable
 fun WelcomeScreen(
@@ -57,36 +58,51 @@ fun WelcomeScreen(
 ) {
     val isDark = isSystemInDarkTheme()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "ambient")
+    val infiniteTransition = rememberInfiniteTransition(label = "welcome")
     val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.90f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(5000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        initialValue = 0.88f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Reverse),
         label = "pulse",
     )
+    val drift by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
+        label = "drift",
+    )
+
+    // Particles
+    val particles = remember {
+        if (isDark) {
+            // Stars for dark mode
+            List(40) { Particle(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 1.8f + 0.3f, Random.nextFloat(), Random.nextFloat()) }
+        } else {
+            // Ice particles for light mode
+            List(30) { Particle(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 2.5f + 0.8f, Random.nextFloat(), Random.nextFloat()) }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color.Black else Color(0xFFF2F6FA)),
+            .background(if (isDark) Color.Black else Color(0xFFF0F5FA)),
     ) {
-        // ── Half-sphere behind buttons ──
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .clipToBounds(),
-        ) {
-            drawHalfSphere(isDark = isDark, pulse = pulse)
+        // Background effects
+        Canvas(modifier = Modifier.fillMaxSize().clipToBounds()) {
+            if (isDark) {
+                drawDarkBackground(pulse, drift, particles)
+            } else {
+                drawLightBackground(pulse, drift, particles)
+            }
         }
 
-        // ── Content ──
+        // Half-sphere
+        Canvas(modifier = Modifier.fillMaxSize().clipToBounds()) {
+            drawHalfSphere(isDark, pulse)
+        }
+
+        // Content
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 30.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 30.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.weight(0.65f))
@@ -100,37 +116,21 @@ fun WelcomeScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Normal,
                 letterSpacing = 3.sp,
-                color = if (isDark) Color(0xFF555555) else Color(0xFF8A9BB0),
+                color = if (isDark) Color(0xFF4A4A4A) else Color(0xFF7A90A8),
                 textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.weight(1.3f))
 
-            // ── Auth Buttons ──
-            SocialButton(
-                iconRes = R.drawable.ic_google,
-                text = "Continue with Google",
-                isDark = isDark,
-                onClick = onGoogleClick,
-            )
+            SocialButton(R.drawable.ic_google, "Continue with Google", isDark, onGoogleClick)
             Spacer(modifier = Modifier.height(10.dp))
-            SocialButton(
-                iconRes = R.drawable.ic_telegram,
-                text = "Continue with Telegram",
-                isDark = isDark,
-                onClick = onTelegramClick,
-            )
+            SocialButton(R.drawable.ic_telegram, "Continue with Telegram", isDark, onTelegramClick)
             Spacer(modifier = Modifier.height(10.dp))
-            SocialButton(
-                iconRes = R.drawable.ic_email,
-                text = "Continue with Email",
-                isDark = isDark,
-                onClick = onEmailClick,
-            )
+            SocialButton(R.drawable.ic_email, "Continue with Email", isDark, onEmailClick)
 
             Spacer(modifier = Modifier.height(22.dp))
 
-            OrDivider(isDark = isDark)
+            OrDivider(isDark)
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -141,11 +141,7 @@ fun WelcomeScreen(
                 color = if (isDark) Color(0xFF5EB0EF) else Color(0xFF2A6FAC),
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(bounded = true),
-                        onClick = onGuestClick,
-                    )
+                    .clickable(remember { MutableInteractionSource() }, ripple(bounded = true), onClick = onGuestClick)
                     .padding(horizontal = 28.dp, vertical = 10.dp),
             )
 
@@ -154,9 +150,8 @@ fun WelcomeScreen(
             Text(
                 text = "By continuing, you agree to our Terms & Privacy Policy",
                 style = MaterialTheme.typography.labelSmall,
-                color = if (isDark) Color(0xFF333333) else Color(0xFFB0B8C0),
-                textAlign = TextAlign.Center,
-                lineHeight = 16.sp,
+                color = if (isDark) Color(0xFF2A2A2A) else Color(0xFFB0B8C0),
+                textAlign = TextAlign.Center, lineHeight = 16.sp,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -164,239 +159,190 @@ fun WelcomeScreen(
     }
 }
 
-// ══════════════════════════════════════
-//  HALF-SPHERE WITH GLOWING EDGE
-// ══════════════════════════════════════
-private fun DrawScope.drawHalfSphere(isDark: Boolean, pulse: Float) {
-    val w = size.width
-    val h = size.height
+data class Particle(val x: Float, val y: Float, val size: Float, val brightness: Float, val offset: Float)
 
-    // Sphere is very large — only the top half (upper arc) is visible.
-    // It sits just above the button area. The center of the full sphere
-    // is placed below the visible area, so we only see the curved top edge.
-    val sphereRadius = w * 1.1f
-    val sphereCenterX = w / 2f
-    // Position: the top of the sphere arc should appear around 55-58% of screen height
-    val sphereCenterY = h * 0.58f + sphereRadius
+private fun DrawScope.drawDarkBackground(pulse: Float, drift: Float, particles: List<Particle>) {
+    val w = size.width; val h = size.height
 
-    if (isDark) {
-        // ── Dark: Subtle glow on the sphere edge ──
+    // Deep blue ambient glow
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFF0A1628).copy(alpha = 0.50f * pulse), Color(0xFF050D18).copy(alpha = 0.20f), Color.Transparent),
+            center = Offset(w * 0.7f, h * 0.2f), radius = w * 0.6f,
+        ),
+        radius = w * 0.6f, center = Offset(w * 0.7f, h * 0.2f),
+    )
 
-        // Atmospheric haze behind the sphere top
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.88f to Color.Transparent,
-                    0.94f to Color(0xFF222222).copy(alpha = 0.15f * pulse),
-                    0.97f to Color(0xFF444444).copy(alpha = 0.10f * pulse),
-                    1.0f to Color(0xFF666666).copy(alpha = 0.04f * pulse),
-                ),
-                center = Offset(sphereCenterX, sphereCenterY),
-                radius = sphereRadius,
-            ),
-            radius = sphereRadius,
-            center = Offset(sphereCenterX, sphereCenterY),
-        )
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFF08122A).copy(alpha = 0.30f * pulse), Color.Transparent),
+            center = Offset(w * 0.2f, h * 0.7f), radius = w * 0.4f,
+        ),
+        radius = w * 0.4f, center = Offset(w * 0.2f, h * 0.7f),
+    )
 
-        // Bright edge ring (the crescent glow)
-        // Outer glow (wide, soft)
-        drawCircle(
-            color = Color.Transparent,
-            radius = sphereRadius,
-            center = Offset(sphereCenterX, sphereCenterY),
-        )
+    // Stars with shooting effect
+    particles.forEach { p ->
+        val t = ((drift + p.offset) % 1f)
+        val starAlpha = (p.brightness * 0.4f + t * 0.6f * p.brightness) * 0.5f
+        val shootX = p.x * w + (drift * 0.02f * w * (p.offset - 0.5f))
+        drawCircle(Color.White.copy(alpha = starAlpha.coerceIn(0f, 0.8f)), p.size, Offset(shootX % w, p.y * h))
 
-        for (i in 1..5) {
-            val strokeW = (6 - i) * 4f
-            val alpha = (0.06f - i * 0.01f).coerceAtLeast(0.005f) * pulse
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0.95f to Color.White.copy(alpha = alpha),
-                        1.0f to Color.White.copy(alpha = alpha * 0.3f),
-                    ),
-                    center = Offset(sphereCenterX, sphereCenterY),
-                    radius = sphereRadius + strokeW,
-                ),
-                radius = sphereRadius + strokeW / 2f,
-                center = Offset(sphereCenterX, sphereCenterY),
-                style = Stroke(width = strokeW),
+        // Shooting trail for bright stars
+        if (p.brightness > 0.7f && t > 0.5f) {
+            val trailLen = p.size * 8f
+            drawLine(
+                Color.White.copy(alpha = (starAlpha * 0.3f).coerceIn(0f, 0.3f)),
+                start = Offset(shootX % w, p.y * h),
+                end = Offset((shootX - trailLen) % w, p.y * h + trailLen * 0.3f),
+                strokeWidth = 0.8f,
             )
         }
+    }
+}
 
-        // Sharp bright edge line
-        drawCircle(
-            brush = Brush.sweepGradient(
-                colorStops = arrayOf(
-                    0.0f to Color.White.copy(alpha = 0.20f * pulse),
-                    0.15f to Color.White.copy(alpha = 0.08f * pulse),
-                    0.35f to Color.White.copy(alpha = 0.02f * pulse),
-                    0.50f to Color.Transparent,
-                    0.65f to Color.White.copy(alpha = 0.02f * pulse),
-                    0.85f to Color.White.copy(alpha = 0.08f * pulse),
-                    1.0f to Color.White.copy(alpha = 0.20f * pulse),
-                ),
-                center = Offset(sphereCenterX, sphereCenterY),
-            ),
-            radius = sphereRadius,
-            center = Offset(sphereCenterX, sphereCenterY),
-            style = Stroke(width = 1.5f),
-        )
+private fun DrawScope.drawLightBackground(pulse: Float, drift: Float, particles: List<Particle>) {
+    val w = size.width; val h = size.height
 
-        // Fill the sphere body (dark, slightly lighter than pure black)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFF060606),
-                    0.85f to Color(0xFF040404),
-                    0.96f to Color(0xFF080808),
-                    1.0f to Color(0xFF0C0C0C),
-                ),
-                center = Offset(sphereCenterX, sphereCenterY),
-                radius = sphereRadius,
-            ),
-            radius = sphereRadius - 1f,
-            center = Offset(sphereCenterX, sphereCenterY),
-        )
+    // Ice blue ambient
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFCCE4F6).copy(alpha = 0.45f * pulse), Color(0xFFDCEEF8).copy(alpha = 0.15f), Color.Transparent),
+            center = Offset(w * 0.75f, h * 0.18f), radius = w * 0.55f,
+        ),
+        radius = w * 0.55f, center = Offset(w * 0.75f, h * 0.18f),
+    )
 
-    } else {
-        // ── Light: Icy blue sphere with soft glow edge ──
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFD4ECF8).copy(alpha = 0.30f * pulse), Color.Transparent),
+            center = Offset(w * 0.15f, h * 0.75f), radius = w * 0.4f,
+        ),
+        radius = w * 0.4f, center = Offset(w * 0.15f, h * 0.75f),
+    )
 
-        // Atmospheric glow around the edge
-        for (i in 1..4) {
-            val strokeW = (5 - i) * 6f
-            val alpha = (0.10f - i * 0.02f).coerceAtLeast(0.01f) * pulse
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0.94f to Color(0xFF8AC8E8).copy(alpha = alpha),
-                        1.0f to Color(0xFFB0DCF2).copy(alpha = alpha * 0.4f),
-                    ),
-                    center = Offset(sphereCenterX, sphereCenterY),
-                    radius = sphereRadius + strokeW,
-                ),
-                radius = sphereRadius + strokeW / 2f,
-                center = Offset(sphereCenterX, sphereCenterY),
-                style = Stroke(width = strokeW),
-            )
-        }
-
-        // Sharp edge line
-        drawCircle(
-            brush = Brush.sweepGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFF6AB4DC).copy(alpha = 0.30f * pulse),
-                    0.15f to Color(0xFF90CCE8).copy(alpha = 0.15f * pulse),
-                    0.35f to Color(0xFFB0DCF2).copy(alpha = 0.05f * pulse),
-                    0.50f to Color.Transparent,
-                    0.65f to Color(0xFFB0DCF2).copy(alpha = 0.05f * pulse),
-                    0.85f to Color(0xFF90CCE8).copy(alpha = 0.15f * pulse),
-                    1.0f to Color(0xFF6AB4DC).copy(alpha = 0.30f * pulse),
-                ),
-                center = Offset(sphereCenterX, sphereCenterY),
-            ),
-            radius = sphereRadius,
-            center = Offset(sphereCenterX, sphereCenterY),
-            style = Stroke(width = 1.5f),
-        )
-
-        // Fill sphere body (almost background color but slightly cooler)
+    // Ice particles
+    particles.forEach { p ->
+        val t = ((drift + p.offset) % 1f)
+        val floatY = (p.y + drift * 0.03f * (p.offset - 0.5f)) % 1f
+        val alpha = (p.brightness * 0.25f + t * 0.15f).coerceIn(0f, 0.4f)
         drawCircle(
             brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFFEFF4F8),
-                    0.80f to Color(0xFFEAF0F5),
-                    0.95f to Color(0xFFE4ECF2),
-                    1.0f to Color(0xFFDDE6EE),
-                ),
-                center = Offset(sphereCenterX, sphereCenterY),
-                radius = sphereRadius,
+                colors = listOf(Color(0xFF8CC8E8).copy(alpha = alpha), Color(0xFFADD8F0).copy(alpha = alpha * 0.3f), Color.Transparent),
+                center = Offset(p.x * w, floatY * h), radius = p.size * 3f,
             ),
-            radius = sphereRadius - 1f,
-            center = Offset(sphereCenterX, sphereCenterY),
+            radius = p.size * 3f, center = Offset(p.x * w, floatY * h),
         )
     }
 }
 
-// ══════════════════════════════════════
-//  SOCIAL BUTTON
-// ══════════════════════════════════════
-@Composable
-private fun SocialButton(
-    iconRes: Int,
-    text: String,
-    isDark: Boolean,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(26.dp)
+private fun DrawScope.drawHalfSphere(isDark: Boolean, pulse: Float) {
+    val w = size.width; val h = size.height
+    val r = w * 1.1f
+    val cx = w / 2f; val cy = h * 0.58f + r
 
+    if (isDark) {
+        for (i in 1..5) {
+            val sw = (6 - i) * 4f
+            val a = (0.06f - i * 0.01f).coerceAtLeast(0.005f) * pulse
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(0.95f to Color(0xFF5EB0EF).copy(alpha = a), 1f to Color(0xFF5EB0EF).copy(alpha = a * 0.2f)),
+                    center = Offset(cx, cy), radius = r + sw,
+                ),
+                radius = r + sw / 2f, center = Offset(cx, cy), style = Stroke(sw),
+            )
+        }
+
+        drawCircle(
+            brush = Brush.sweepGradient(
+                colorStops = arrayOf(
+                    0f to Color(0xFF5EB0EF).copy(alpha = 0.15f * pulse),
+                    0.15f to Color(0xFF5EB0EF).copy(alpha = 0.06f * pulse),
+                    0.35f to Color.Transparent,
+                    0.5f to Color.Transparent,
+                    0.65f to Color.Transparent,
+                    0.85f to Color(0xFF5EB0EF).copy(alpha = 0.06f * pulse),
+                    1f to Color(0xFF5EB0EF).copy(alpha = 0.15f * pulse),
+                ),
+                center = Offset(cx, cy),
+            ),
+            radius = r, center = Offset(cx, cy), style = Stroke(1.5f),
+        )
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(0f to Color(0xFF040408), 0.9f to Color(0xFF030306), 0.97f to Color(0xFF080810), 1f to Color(0xFF0C0C16)),
+                center = Offset(cx, cy), radius = r,
+            ),
+            radius = r - 1f, center = Offset(cx, cy),
+        )
+    } else {
+        for (i in 1..4) {
+            val sw = (5 - i) * 6f
+            val a = (0.12f - i * 0.025f).coerceAtLeast(0.01f) * pulse
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(0.94f to Color(0xFF7AB8DC).copy(alpha = a), 1f to Color(0xFF9CCCE8).copy(alpha = a * 0.3f)),
+                    center = Offset(cx, cy), radius = r + sw,
+                ),
+                radius = r + sw / 2f, center = Offset(cx, cy), style = Stroke(sw),
+            )
+        }
+
+        drawCircle(
+            brush = Brush.sweepGradient(
+                colorStops = arrayOf(
+                    0f to Color(0xFF5AAAD0).copy(alpha = 0.25f * pulse),
+                    0.15f to Color(0xFF80C0E0).copy(alpha = 0.12f * pulse),
+                    0.35f to Color.Transparent,
+                    0.5f to Color.Transparent,
+                    0.65f to Color.Transparent,
+                    0.85f to Color(0xFF80C0E0).copy(alpha = 0.12f * pulse),
+                    1f to Color(0xFF5AAAD0).copy(alpha = 0.25f * pulse),
+                ),
+                center = Offset(cx, cy),
+            ),
+            radius = r, center = Offset(cx, cy), style = Stroke(1.5f),
+        )
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(0f to Color(0xFFECF2F8), 0.85f to Color(0xFFE6EEF4), 0.96f to Color(0xFFDEE8F0), 1f to Color(0xFFD6E2EC)),
+                center = Offset(cx, cy), radius = r,
+            ),
+            radius = r - 1f, center = Offset(cx, cy),
+        )
+    }
+}
+
+@Composable
+private fun SocialButton(iconRes: Int, text: String, isDark: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(26.dp)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(54.dp)
-            .clip(shape)
+        modifier = Modifier.fillMaxWidth().height(54.dp).clip(shape)
             .then(
-                if (isDark) {
-                    Modifier
-                        .background(Color(0xFF0F0F0F))
-                        .border(0.8.dp, Color(0xFF1E1E1E), shape)
-                } else {
-                    Modifier
-                        .background(Color.White)
-                        .border(1.dp, Color(0xFFDDE2E8), shape)
-                }
+                if (isDark) Modifier.background(Color(0xFF0A0A0A)).border(0.8.dp, Color(0xFF1C1C1C), shape)
+                else Modifier.background(Color.White).border(1.dp, Color(0xFFD8DEE6), shape)
             )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onClick,
-            )
+            .clickable(remember { MutableInteractionSource() }, ripple(bounded = true), onClick = onClick)
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-            tint = Color.Unspecified,
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = if (isDark) Color(0xFFCCCCCC) else Color(0xFF222222),
-        )
+        Icon(painterResource(iconRes), null, Modifier.size(22.dp), tint = Color.Unspecified)
+        Spacer(Modifier.width(14.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium,
+            color = if (isDark) Color(0xFFCCCCCC) else Color(0xFF222222))
     }
 }
 
-// ══════════════════════════════════════
-//  DIVIDER
-// ══════════════════════════════════════
 @Composable
 private fun OrDivider(isDark: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(0.5.dp)
-                .background(if (isDark) Color(0xFF1A1A1A) else Color(0xFFDDE2E8)),
-        )
-        Text(
-            text = "or",
-            modifier = Modifier.padding(horizontal = 20.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isDark) Color(0xFF444444) else Color(0xFFAAB0B8),
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(0.5.dp)
-                .background(if (isDark) Color(0xFF1A1A1A) else Color(0xFFDDE2E8)),
-        )
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f).height(0.5.dp).background(if (isDark) Color(0xFF181818) else Color(0xFFD8DEE6)))
+        Text("or", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.bodySmall,
+            color = if (isDark) Color(0xFF3A3A3A) else Color(0xFFAAB0B8))
+        Box(Modifier.weight(1f).height(0.5.dp).background(if (isDark) Color(0xFF181818) else Color(0xFFD8DEE6)))
     }
 }

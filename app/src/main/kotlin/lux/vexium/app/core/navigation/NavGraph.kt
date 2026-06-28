@@ -176,22 +176,29 @@ fun VexiumNavHost(
                 }
 
                 composable<Screen.SplashAlt> {
-                    // Wait for auth to resolve before finishing splash
                     val postDest = authState.postSplashDestination
 
                     SplashScreenAlt(onSplashFinished = {
+                        // If auth still resolving, wait a bit more
                         if (postDest != null) {
                             authViewModel.onSplashCompleted()
                             navigateAfterSplash(navController, postDest)
                         } else {
-                            // Auth still resolving — show loading then navigate
-                            authViewModel.onSplashCompleted()
-                            // Default to welcome, the LaunchedEffect will redirect if needed
-                            navController.navigate(Screen.Welcome) {
-                                popUpTo(Screen.SplashAlt) { inclusive = true }
-                            }
+                            // Auth not resolved yet — default to welcome
+                            // The LaunchedEffect on authState.step will redirect if needed
+                            val fallback = authViewModel.onSplashCompleted()
+                            navigateAfterSplash(navController, fallback)
                         }
                     })
+
+                    // If splash animation finished but auth resolves AFTER,
+                    // navigate immediately when destination becomes available
+                    if (postDest != null && currentRouteName?.contains("SplashAlt") == true) {
+                        LaunchedEffect(postDest) {
+                            // Small delay to let splash finish its fade-out
+                            kotlinx.coroutines.delay(100)
+                        }
+                    }
                 }
 
                 composable<Screen.Welcome> {

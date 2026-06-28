@@ -2,7 +2,11 @@ package lux.vexium.app.feature.splash.presentation
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,96 +35,91 @@ import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
-/**
- * Splash Screen Alt — Sphere with warm lightning sweep.
- *
- * Pure black → sphere appears → warm light sweeps left to right
- * along the sphere edge → "Vexium" fades in → fade out → navigate.
- */
 @Composable
 fun SplashScreenAlt(
     onSplashFinished: () -> Unit,
 ) {
     var phase by remember { mutableStateOf(0) }
 
-    // Sweep progress: 0 = light at left edge, 1 = light at right edge
+    // Sphere
+    val sphereAlpha = remember { Animatable(0f) }
+
+    // Sweep
     val sweepProgress = remember { Animatable(0f) }
 
-    // Sphere fade-in
-    var sphereTargetAlpha by remember { mutableFloatStateOf(0f) }
-    val sphereAlpha by animateFloatAsState(
-        targetValue = sphereTargetAlpha,
-        animationSpec = tween(800),
-        label = "sphere_alpha",
+    // Stars twinkle
+    val infiniteTransition = rememberInfiniteTransition(label = "stars")
+    val twinkle by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "twinkle",
     )
 
-    // Text fade
+    // Text
     var textTargetAlpha by remember { mutableFloatStateOf(0f) }
-    val textAlpha by animateFloatAsState(
-        targetValue = textTargetAlpha,
-        animationSpec = tween(1000),
-        label = "text_alpha",
-    )
+    val textAlpha by animateFloatAsState(textTargetAlpha, tween(1000), label = "text")
 
-    // Screen fade-out
+    // Screen fade
     val screenAlpha = remember { Animatable(1f) }
 
+    // Generate stars once
+    val stars = remember {
+        List(60) {
+            StarData(
+                x = Random.nextFloat(),
+                y = Random.nextFloat(),
+                size = Random.nextFloat() * 2f + 0.5f,
+                brightness = Random.nextFloat(),
+                twinkleOffset = Random.nextFloat(),
+            )
+        }
+    }
+
     LaunchedEffect(Unit) {
-        // Phase 0: Pure black (0.5s)
+        // Phase 0: Stars appear + sphere fades in (0-2s)
         delay(500)
+        sphereAlpha.animateTo(1f, tween(1500))
 
-        // Phase 1: Sphere fades in
+        // Phase 1: Warm light sweeps (2-4.5s)
         phase = 1
-        sphereTargetAlpha = 1f
-        delay(800)
+        sweepProgress.animateTo(1f, tween(2500, easing = LinearEasing))
 
-        // Phase 2: Light sweeps left → right
+        // Phase 2: Text fades in (4.5-6.5s)
         phase = 2
-        sweepProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 1800, easing = LinearEasing),
-        )
-        delay(200)
-
-        // Phase 3: Text fades in
-        phase = 3
         textTargetAlpha = 1f
-        delay(1200)
+        delay(2000)
 
-        // Phase 4: Fade out
-        phase = 4
-        screenAlpha.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(700),
-        )
+        // Phase 3: Fade out (6.5-7.3s)
+        phase = 3
+        screenAlpha.animateTo(0f, tween(800))
 
         onSplashFinished()
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
+        modifier = Modifier.fillMaxSize().background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
-        // Sphere + sweep
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .clipToBounds(),
-        ) {
-            if (phase >= 1) {
+        Canvas(modifier = Modifier.fillMaxSize().clipToBounds()) {
+            val alpha = screenAlpha.value
+
+            // Stars
+            drawStars(stars, twinkle, alpha)
+
+            // Sphere
+            if (sphereAlpha.value > 0f) {
                 drawSplashSphere(
-                    sphereAlpha = sphereAlpha * screenAlpha.value,
-                    sweepProgress = if (phase >= 2) sweepProgress.value else 0f,
-                    screenAlpha = screenAlpha.value,
+                    sphereAlpha = sphereAlpha.value * alpha,
+                    sweepProgress = if (phase >= 1) sweepProgress.value else 0f,
+                    alpha = alpha,
                 )
             }
         }
 
         // Text
-        if (phase >= 3) {
+        if (phase >= 2) {
             Text(
                 text = "Vexium",
                 style = TextStyle(
@@ -134,142 +133,117 @@ fun SplashScreenAlt(
     }
 }
 
-private fun DrawScope.drawSplashSphere(
-    sphereAlpha: Float,
-    sweepProgress: Float,
-    screenAlpha: Float,
-) {
-    val w = size.width
-    val h = size.height
+data class StarData(
+    val x: Float, val y: Float, val size: Float,
+    val brightness: Float, val twinkleOffset: Float,
+)
 
-    val sphereRadius = w * 0.85f
-    val cx = w / 2f
-    val cy = h / 2f + sphereRadius * 0.25f  // sphere center below screen center
+private fun DrawScope.drawStars(stars: List<StarData>, twinkle: Float, alpha: Float) {
+    val w = size.width; val h = size.height
+    stars.forEach { star ->
+        val t = ((twinkle + star.twinkleOffset) % 1f)
+        val starAlpha = (star.brightness * 0.3f + t * 0.7f * star.brightness) * alpha * 0.6f
+        drawCircle(
+            color = Color.White.copy(alpha = starAlpha.coerceIn(0f, 1f)),
+            radius = star.size,
+            center = Offset(star.x * w, star.y * h),
+        )
+    }
+}
 
-    // ── Sphere body (very dark, barely visible) ──
+private fun DrawScope.drawSplashSphere(sphereAlpha: Float, sweepProgress: Float, alpha: Float) {
+    val w = size.width; val h = size.height
+    val r = w * 0.85f
+    val cx = w / 2f; val cy = h / 2f + r * 0.25f
+
+    // Body
     drawCircle(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
-                0.0f to Color(0xFF050505).copy(alpha = sphereAlpha),
-                0.90f to Color(0xFF030303).copy(alpha = sphereAlpha),
-                0.97f to Color(0xFF080808).copy(alpha = sphereAlpha),
-                1.0f to Color(0xFF0A0A0A).copy(alpha = sphereAlpha),
+                0f to Color(0xFF030308).copy(alpha = sphereAlpha),
+                0.92f to Color(0xFF020206).copy(alpha = sphereAlpha),
+                0.97f to Color(0xFF0A0A12).copy(alpha = sphereAlpha),
+                1f to Color(0xFF0E0E18).copy(alpha = sphereAlpha),
             ),
-            center = Offset(cx, cy),
-            radius = sphereRadius,
+            center = Offset(cx, cy), radius = r,
         ),
-        radius = sphereRadius,
-        center = Offset(cx, cy),
+        radius = r, center = Offset(cx, cy),
     )
 
-    // ── Subtle edge ring (always visible, dim) ──
+    // Edge glow
     for (i in 1..3) {
         val sw = i * 3f
         val a = (0.04f - i * 0.01f).coerceAtLeast(0.005f) * sphereAlpha
-        drawCircle(
-            color = Color.White.copy(alpha = a),
-            radius = sphereRadius + sw,
-            center = Offset(cx, cy),
-            style = Stroke(width = sw),
-        )
+        drawCircle(Color.White.copy(alpha = a), r + sw, Offset(cx, cy), style = Stroke(sw))
     }
-
     drawCircle(
-        color = Color.White.copy(alpha = 0.06f * sphereAlpha),
-        radius = sphereRadius,
-        center = Offset(cx, cy),
-        style = Stroke(width = 1f),
+        brush = Brush.sweepGradient(
+            colorStops = arrayOf(
+                0f to Color(0xFF5EB0EF).copy(alpha = 0.08f * sphereAlpha),
+                0.25f to Color.White.copy(alpha = 0.03f * sphereAlpha),
+                0.5f to Color.Transparent,
+                0.75f to Color.White.copy(alpha = 0.03f * sphereAlpha),
+                1f to Color(0xFF5EB0EF).copy(alpha = 0.08f * sphereAlpha),
+            ),
+            center = Offset(cx, cy),
+        ),
+        radius = r, center = Offset(cx, cy), style = Stroke(1.5f),
     )
 
-    // ── Warm lightning sweep ──
+    // Sweep light
     if (sweepProgress > 0f) {
-        // The light travels along the top arc of the sphere from left to right.
-        // sweepProgress 0→1 maps to angle from ~210° (left) to ~330° (right)
-        // on the circle (measuring from 3 o'clock, counter-clockwise for top)
-        val startAngle = 210f  // left side of visible arc
-        val endAngle = 330f    // right side of visible arc
-        val currentAngle = startAngle + (endAngle - startAngle) * sweepProgress
-        val angleRad = currentAngle * PI.toFloat() / 180f
+        val startA = 210f; val endA = 330f
+        val curA = startA + (endA - startA) * sweepProgress
+        val rad = curA * PI.toFloat() / 180f
+        val lx = cx + r * cos(rad); val ly = cy + r * sin(rad)
 
-        val lightX = cx + sphereRadius * cos(angleRad)
-        val lightY = cy + sphereRadius * sin(angleRad)
+        val warmWhite = Color(0xFFFFF8F0); val warmGold = Color(0xFFFFE4B5)
 
-        // Warm colors
-        val warmWhite = Color(0xFFFFF8F0)
-        val warmGold = Color(0xFFFFE4B5)
-
-        // Wide soft glow around the light point
         drawCircle(
             brush = Brush.radialGradient(
                 colorStops = arrayOf(
-                    0.0f to warmWhite.copy(alpha = 0.35f * screenAlpha),
-                    0.15f to warmGold.copy(alpha = 0.18f * screenAlpha),
-                    0.4f to warmGold.copy(alpha = 0.05f * screenAlpha),
-                    1.0f to Color.Transparent,
+                    0f to warmWhite.copy(alpha = 0.40f * alpha),
+                    0.12f to warmGold.copy(alpha = 0.20f * alpha),
+                    0.4f to warmGold.copy(alpha = 0.05f * alpha),
+                    1f to Color.Transparent,
                 ),
-                center = Offset(lightX, lightY),
-                radius = sphereRadius * 0.35f,
+                center = Offset(lx, ly), radius = r * 0.30f,
             ),
-            radius = sphereRadius * 0.35f,
-            center = Offset(lightX, lightY),
+            radius = r * 0.30f, center = Offset(lx, ly),
         )
 
-        // Bright core
         drawCircle(
             brush = Brush.radialGradient(
                 colorStops = arrayOf(
-                    0.0f to Color.White.copy(alpha = 0.70f * screenAlpha),
-                    0.15f to warmWhite.copy(alpha = 0.40f * screenAlpha),
-                    0.4f to warmWhite.copy(alpha = 0.08f * screenAlpha),
-                    1.0f to Color.Transparent,
+                    0f to Color.White.copy(alpha = 0.75f * alpha),
+                    0.1f to warmWhite.copy(alpha = 0.40f * alpha),
+                    0.35f to warmWhite.copy(alpha = 0.08f * alpha),
+                    1f to Color.Transparent,
                 ),
-                center = Offset(lightX, lightY),
-                radius = sphereRadius * 0.12f,
+                center = Offset(lx, ly), radius = r * 0.10f,
             ),
-            radius = sphereRadius * 0.12f,
-            center = Offset(lightX, lightY),
+            radius = r * 0.10f, center = Offset(lx, ly),
         )
 
-        // Trail: fading glow behind the light (previous positions)
-        val trailLength = 0.15f
-        val trailSteps = 8
-        for (t in 1..trailSteps) {
-            val trailProgress = (sweepProgress - trailLength * t / trailSteps).coerceAtLeast(0f)
-            val trailAngle = startAngle + (endAngle - startAngle) * trailProgress
-            val trailRad = trailAngle * PI.toFloat() / 180f
-            val tx = cx + sphereRadius * cos(trailRad)
-            val ty = cy + sphereRadius * sin(trailRad)
-            val trailAlpha = (1f - t.toFloat() / trailSteps) * 0.12f * screenAlpha
-
+        // Trail
+        for (t in 1..10) {
+            val tp = (sweepProgress - 0.12f * t / 10f).coerceAtLeast(0f)
+            val ta = startA + (endA - startA) * tp
+            val tr = ta * PI.toFloat() / 180f
+            val trailAlpha = (1f - t / 10f) * 0.10f * alpha
             drawCircle(
-                brush = Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0.0f to warmGold.copy(alpha = trailAlpha),
-                        0.5f to warmGold.copy(alpha = trailAlpha * 0.3f),
-                        1.0f to Color.Transparent,
-                    ),
-                    center = Offset(tx, ty),
-                    radius = sphereRadius * 0.08f,
-                ),
-                radius = sphereRadius * 0.08f,
-                center = Offset(tx, ty),
+                warmGold.copy(alpha = trailAlpha),
+                r * 0.06f,
+                Offset(cx + r * cos(tr), cy + r * sin(tr)),
             )
         }
 
-        // Illuminate the sphere edge near the light (bright arc segment)
-        val arcSpread = 25f // degrees of arc lit up around the light
-        for (deg in -arcSpread.toInt()..arcSpread.toInt()) {
-            val a = currentAngle + deg
-            val aRad = a * PI.toFloat() / 180f
-            val px = cx + sphereRadius * cos(aRad)
-            val py = cy + sphereRadius * sin(aRad)
-            val intensity = (1f - (kotlin.math.abs(deg) / arcSpread)) * 0.25f * screenAlpha
-
-            drawCircle(
-                color = warmWhite.copy(alpha = intensity),
-                radius = 3f,
-                center = Offset(px, py),
-            )
+        // Arc illumination
+        for (deg in -20..20) {
+            val a = curA + deg
+            val ar = a * PI.toFloat() / 180f
+            val intensity = (1f - (kotlin.math.abs(deg) / 20f)) * 0.20f * alpha
+            drawCircle(warmWhite.copy(alpha = intensity), 2.5f, Offset(cx + r * cos(ar), cy + r * sin(ar)))
         }
     }
 }
