@@ -142,6 +142,7 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.compose.auth)
+    implementation(libs.supabase.functions)
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.utils)
