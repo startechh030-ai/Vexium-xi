@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import lux.vexium.app.data.local.PreferencesManager
 import lux.vexium.app.feature.auth.data.AuthRepository
 import lux.vexium.app.feature.auth.data.ProfileUpdate
+import lux.vexium.app.feature.auth.data.SecurityManager
 import javax.inject.Inject
 
 private const val TAG = "VexiumAuth"
@@ -57,6 +58,7 @@ enum class PostSplashDestination {
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val preferencesManager: PreferencesManager,
+    private val securityManager: SecurityManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -128,6 +130,24 @@ class AuthViewModel @Inject constructor(
      * This way splash shows until we know exactly where to navigate.
      */
     private suspend fun determineSplashDestination(userId: String) {
+        // Try local first (works offline)
+        val localPinHash = preferencesManager.getLocalPinHash()
+        val localHasPin = localPinHash != null
+        val localName = preferencesManager.getUserDisplayName()
+        val localInitials = preferencesManager.getUserInitials()
+
+        if (localHasPin && localName != null) {
+            // We have cached data — go straight to PIN (even offline)
+            _uiState.value = _uiState.value.copy(
+                postSplashDestination = PostSplashDestination.VERIFY_PIN,
+                userName = localName,
+                userInitials = localInitials ?: "U",
+                avatarUrl = preferencesManager.getUserAvatarUrl(),
+            )
+            return
+        }
+
+        // No local cache — try Supabase (requires network)
         try {
             val profile = authRepository.getProfile(userId)
             val hasPin = profile?.quickLoginPinHash != null
@@ -136,6 +156,12 @@ class AuthViewModel @Inject constructor(
             val initials = displayName.split(" ")
                 .take(2).mapNotNull { it.firstOrNull()?.uppercase() }
                 .joinToString("").ifEmpty { "U" }
+
+            // Cache locally for offline use
+            preferencesManager.saveUserDisplayInfo(displayName, initials, profile?.avatarUrl)
+            if (hasPin && profile?.quickLoginPinHash != null) {
+                preferencesManager.savePinHashLocally(profile.quickLoginPinHash)
+            }
 
             if (hasPin) {
                 _uiState.value = _uiState.value.copy(
@@ -151,8 +177,9 @@ class AuthViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Splash destination check failed: ${e.message}")
+            // Offline and no local cache — go to welcome
             _uiState.value = _uiState.value.copy(
-                postSplashDestination = PostSplashDestination.WELCOME,
+                postSplashDestination = if (localHasPin) PostSplashDestination.VERIFY_PIN else PostSplashDestination.WELCOME,
             )
         }
     }
@@ -176,7 +203,16 @@ class AuthViewModel @Inject constructor(
      */
     private suspend fun processAuthenticatedUser(userId: String) {
         try {
-            val profile = authRepository.getProfile(userId)
+            // Retry profile fetch — Supabase trigger may not have created the row yet
+            var profile = authRepository.getProfile(userId)
+            var retries = 0
+            while (profile == null && retries < 5) {
+                retries++
+                Log.d(TAG, "Profile not found, retry $retries/5...")
+                kotlinx.coroutines.delay(800L)
+                profile = authRepository.getProfile(userId)
+            }
+
             val hasUsername = profile?.username != null
             val hasPin = profile?.quickLoginPinHash != null
 
@@ -188,7 +224,19 @@ class AuthViewModel @Inject constructor(
                 .take(2).mapNotNull { it.firstOrNull()?.uppercase() }
                 .joinToString("").ifEmpty { "U" }
 
+            // Cache user info locally for offline
+            preferencesManager.saveUserDisplayInfo(displayName, initials, profile?.avatarUrl)
+
             Log.d(TAG, "Profile: user=$hasUsername pin=$hasPin fresh=$isFreshSignIn")
+
+            // Verify device session with Edge Function (background, non-blocking)
+            viewModelScope.launch {
+                try {
+                    securityManager.verifySession()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Security verify skipped: ${e.message}")
+                }
+            }
 
             val nextStep = when {
                 // Existing user with PIN → skip everything, straight home
@@ -328,6 +376,7 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, loadingMessage = "Signing out...")
             try {
+                securityManager.clearSession()
                 authRepository.signOut()
                 preferencesManager.clearAll()
             } catch (_: Exception) { }

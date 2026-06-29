@@ -91,13 +91,8 @@ fun VexiumTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    val isDark = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    }
-
-    val colorScheme = if (isDark) VexiumDarkScheme else VexiumLightScheme
+    // Dark only — gaming aesthetic
+    val colorScheme = VexiumDarkScheme
     val view = LocalView.current
 
     if (!view.isInEditMode) {
@@ -106,8 +101,8 @@ fun VexiumTheme(
             window.statusBarColor = Color.Transparent.toArgb()
             window.navigationBarColor = Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !isDark
-                isAppearanceLightNavigationBars = !isDark
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
             }
         }
     }

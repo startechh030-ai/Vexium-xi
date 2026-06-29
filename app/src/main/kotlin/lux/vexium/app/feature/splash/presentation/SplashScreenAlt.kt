@@ -197,53 +197,53 @@ private fun DrawScope.drawSplashSphere(sphereAlpha: Float, sweepProgress: Float,
         val rad = curA * PI.toFloat() / 180f
         val lx = cx + r * cos(rad); val ly = cy + r * sin(rad)
 
-        val warmWhite = Color(0xFFFFF8F0); val warmGold = Color(0xFFFFE4B5)
+        val warmWhite = Color(0xFFF0F0F8); val warmGold = Color(0xFFD4C8A0)
 
         drawCircle(
             brush = Brush.radialGradient(
                 colorStops = arrayOf(
-                    0f to warmWhite.copy(alpha = 0.40f * alpha),
-                    0.12f to warmGold.copy(alpha = 0.20f * alpha),
-                    0.4f to warmGold.copy(alpha = 0.05f * alpha),
+                    0f to warmWhite.copy(alpha = 0.25f * alpha),
+                    0.12f to warmGold.copy(alpha = 0.12f * alpha),
+                    0.4f to warmGold.copy(alpha = 0.03f * alpha),
                     1f to Color.Transparent,
                 ),
-                center = Offset(lx, ly), radius = r * 0.30f,
+                center = Offset(lx, ly), radius = r * 0.25f,
             ),
-            radius = r * 0.30f, center = Offset(lx, ly),
+            radius = r * 0.25f, center = Offset(lx, ly),
         )
 
         drawCircle(
             brush = Brush.radialGradient(
                 colorStops = arrayOf(
-                    0f to Color.White.copy(alpha = 0.75f * alpha),
-                    0.1f to warmWhite.copy(alpha = 0.40f * alpha),
-                    0.35f to warmWhite.copy(alpha = 0.08f * alpha),
+                    0f to Color.White.copy(alpha = 0.50f * alpha),
+                    0.1f to warmWhite.copy(alpha = 0.25f * alpha),
+                    0.35f to warmWhite.copy(alpha = 0.05f * alpha),
                     1f to Color.Transparent,
                 ),
-                center = Offset(lx, ly), radius = r * 0.10f,
+                center = Offset(lx, ly), radius = r * 0.08f,
             ),
-            radius = r * 0.10f, center = Offset(lx, ly),
+            radius = r * 0.08f, center = Offset(lx, ly),
         )
 
         // Trail
-        for (t in 1..10) {
-            val tp = (sweepProgress - 0.12f * t / 10f).coerceAtLeast(0f)
+        for (t in 1..8) {
+            val tp = (sweepProgress - 0.10f * t / 8f).coerceAtLeast(0f)
             val ta = startA + (endA - startA) * tp
             val tr = ta * PI.toFloat() / 180f
-            val trailAlpha = (1f - t / 10f) * 0.10f * alpha
+            val trailAlpha = (1f - t / 8f) * 0.06f * alpha
             drawCircle(
                 warmGold.copy(alpha = trailAlpha),
-                r * 0.06f,
+                r * 0.04f,
                 Offset(cx + r * cos(tr), cy + r * sin(tr)),
             )
         }
 
         // Arc illumination
-        for (deg in -20..20) {
+        for (deg in -15..15) {
             val a = curA + deg
             val ar = a * PI.toFloat() / 180f
-            val intensity = (1f - (kotlin.math.abs(deg) / 20f)) * 0.20f * alpha
-            drawCircle(warmWhite.copy(alpha = intensity), 2.5f, Offset(cx + r * cos(ar), cy + r * sin(ar)))
+            val intensity = (1f - (kotlin.math.abs(deg) / 15f)) * 0.12f * alpha
+            drawCircle(warmWhite.copy(alpha = intensity), 2f, Offset(cx + r * cos(ar), cy + r * sin(ar)))
         }
     }
 }

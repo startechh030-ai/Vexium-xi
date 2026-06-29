@@ -24,7 +24,7 @@ import coil3.svg.SvgDecoder
 @Composable
 fun VexiumLogo(
     modifier: Modifier = Modifier,
-    isDark: Boolean = isSystemInDarkTheme(),
+    isDark: Boolean = true, // Dark theme only
     width: Dp = 300.dp,
     height: Dp = 120.dp,
 ) {

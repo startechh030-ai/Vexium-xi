@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import lux.vexium.app.data.local.PreferencesManager
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +36,7 @@ data class ProfileUpdate(
 class AuthRepository @Inject constructor(
     private val auth: Auth,
     private val postgrest: Postgrest,
+    private val preferencesManager: PreferencesManager,
 ) {
     val sessionStatus: Flow<SessionStatus> = auth.sessionStatus
 
@@ -86,12 +88,34 @@ class AuthRepository @Inject constructor(
 
     suspend fun savePin(userId: String, pin: String) {
         val hash = hashPin(pin)
+        // Save to both Supabase AND local storage
         updateProfile(userId, ProfileUpdate(quickLoginPinHash = hash))
+        preferencesManager.savePinHashLocally(hash)
     }
 
+    /**
+     * Verify PIN — tries local first (works offline), falls back to Supabase.
+     */
     suspend fun verifyPin(userId: String, pin: String): Boolean {
-        val profile = getProfile(userId) ?: return false
         val hash = hashPin(pin)
-        return profile.quickLoginPinHash == hash
+
+        // Try local first (instant, works offline)
+        val localHash = preferencesManager.getLocalPinHash()
+        if (localHash != null) {
+            return localHash == hash
+        }
+
+        // Fallback to Supabase (online only)
+        return try {
+            val profile = getProfile(userId) ?: return false
+            val match = profile.quickLoginPinHash == hash
+            // Cache it locally for next time
+            if (match && profile.quickLoginPinHash != null) {
+                preferencesManager.savePinHashLocally(profile.quickLoginPinHash)
+            }
+            match
+        } catch (e: Exception) {
+            false
+        }
     }
 }
