@@ -11,7 +11,6 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.functions.functions
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import lux.vexium.app.data.local.PreferencesManager
@@ -43,8 +42,6 @@ class SecurityManager @Inject constructor(
     private val supabaseClient: SupabaseClient,
     private val preferencesManager: PreferencesManager,
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
-
     @SuppressLint("HardwareIds")
     fun getDeviceId(): String {
         return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
@@ -70,12 +67,12 @@ class SecurityManager @Inject constructor(
                 put("action", "verify")
             }
 
-            val responseBody = supabaseClient.functions.invoke("verify-session") {
-                this.body = body
-            }.decodeAs<String>()
+            val result: VerifySessionResponse = supabaseClient.functions.invoke(
+                function = "verify-session",
+                body = body,
+            )
 
-            Log.d(TAG, "Verify response: $responseBody")
-            val result = json.decodeFromString<VerifySessionResponse>(responseBody)
+            Log.d(TAG, "Verify result: verified=${result.verified}")
 
             if (result.verified && result.sessionToken != null) {
                 preferencesManager.saveDeviceSessionToken(result.sessionToken)
@@ -101,11 +98,11 @@ class SecurityManager @Inject constructor(
                 put("device_id", deviceId)
             }
 
-            val responseBody = supabaseClient.functions.invoke("validate-token") {
-                this.body = body
-            }.decodeAs<String>()
+            val result: ValidateTokenResponse = supabaseClient.functions.invoke(
+                function = "validate-token",
+                body = body,
+            )
 
-            val result = json.decodeFromString<ValidateTokenResponse>(responseBody)
             Log.d(TAG, "Validate: ${if (result.valid) "✅" else "❌"}")
             result.valid
         } catch (e: Exception) {
