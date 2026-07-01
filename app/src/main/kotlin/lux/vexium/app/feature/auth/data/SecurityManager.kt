@@ -9,7 +9,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.functions.functions
-import io.ktor.client.call.body
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -52,15 +51,6 @@ class SecurityManager @Inject constructor(
             ?: "unknown-device"
     }
 
-    fun getDeviceInfo(): Map<String, String> {
-        return mapOf(
-            "device_id" to getDeviceId(),
-            "device_model" to "${Build.MANUFACTURER} ${Build.MODEL}",
-            "os_version" to "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
-            "app_version" to "1.0.0",
-        )
-    }
-
     suspend fun verifySession(): VerifySessionResponse? {
         return try {
             val accessToken = supabaseClient.auth.currentAccessTokenOrNull()
@@ -70,22 +60,20 @@ class SecurityManager @Inject constructor(
             }
 
             val deviceId = getDeviceId()
-            val deviceInfo = getDeviceInfo()
             Log.d(TAG, "Verifying session for device: ${deviceId.take(8)}...")
 
             val body = buildJsonObject {
                 put("device_id", deviceId)
-                put("device_model", deviceInfo["device_model"] ?: "")
-                put("os_version", deviceInfo["os_version"] ?: "")
-                put("app_version", deviceInfo["app_version"] ?: "")
+                put("device_model", "${Build.MANUFACTURER} ${Build.MODEL}")
+                put("os_version", "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+                put("app_version", "1.0.0")
                 put("action", "verify")
             }
 
-            val response = supabaseClient.functions.invoke("verify-session") {
+            val responseBody = supabaseClient.functions.invoke("verify-session") {
                 this.body = body
-            }
+            }.decodeAs<String>()
 
-            val responseBody: String = response.body()
             Log.d(TAG, "Verify response: $responseBody")
             val result = json.decodeFromString<VerifySessionResponse>(responseBody)
 
@@ -113,11 +101,10 @@ class SecurityManager @Inject constructor(
                 put("device_id", deviceId)
             }
 
-            val response = supabaseClient.functions.invoke("validate-token") {
+            val responseBody = supabaseClient.functions.invoke("validate-token") {
                 this.body = body
-            }
+            }.decodeAs<String>()
 
-            val responseBody: String = response.body()
             val result = json.decodeFromString<ValidateTokenResponse>(responseBody)
             Log.d(TAG, "Validate: ${if (result.valid) "✅" else "❌"}")
             result.valid
