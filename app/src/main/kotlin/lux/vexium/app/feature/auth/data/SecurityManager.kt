@@ -2,16 +2,14 @@ package lux.vexium.app.feature.auth.data
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.call.body
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -48,62 +46,65 @@ class SecurityManager @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    /**
-     * Get a stable device ID (Android ID).
-     */
     @SuppressLint("HardwareIds")
     fun getDeviceId(): String {
         return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
             ?: "unknown-device"
     }
 
-    /**
-     * Full verification: send device_id + user JWT to Edge Function.
-     * Returns a short-lived session token.
-     * Call on: first open, login, logout.
-     */
+    fun getDeviceInfo(): Map<String, String> {
+        return mapOf(
+            "device_id" to getDeviceId(),
+            "device_model" to "${Build.MANUFACTURER} ${Build.MODEL}",
+            "os_version" to "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
+            "app_version" to "1.0.0",
+        )
+    }
+
     suspend fun verifySession(): VerifySessionResponse? {
         return try {
-            val accessToken = supabaseClient.auth.currentAccessTokenOrNull() ?: return null
-            val deviceId = getDeviceId()
+            val accessToken = supabaseClient.auth.currentAccessTokenOrNull()
+            if (accessToken == null) {
+                Log.w(TAG, "No access token — skipping verify")
+                return null
+            }
 
+            val deviceId = getDeviceId()
+            val deviceInfo = getDeviceInfo()
             Log.d(TAG, "Verifying session for device: ${deviceId.take(8)}...")
 
             val body = buildJsonObject {
                 put("device_id", deviceId)
+                put("device_model", deviceInfo["device_model"] ?: "")
+                put("os_version", deviceInfo["os_version"] ?: "")
+                put("app_version", deviceInfo["app_version"] ?: "")
                 put("action", "verify")
             }
 
-            val response = supabaseClient.functions.invoke(
-                function = "verify-session",
-                body = body,
-                headers = Headers.build {
-                    append(HttpHeaders.Authorization, "Bearer $accessToken")
-                },
-            )
+            val response = supabaseClient.functions.invoke("verify-session") {
+                this.body = body
+            }
 
-            val responseBody = response.body<String>()
+            val responseBody: String = response.body()
+            Log.d(TAG, "Verify response: $responseBody")
             val result = json.decodeFromString<VerifySessionResponse>(responseBody)
 
             if (result.verified && result.sessionToken != null) {
                 preferencesManager.saveDeviceSessionToken(result.sessionToken)
-                Log.d(TAG, "Session verified ✅ token: ${result.sessionToken.take(8)}...")
+                Log.d(TAG, "Session verified ✅")
+            } else {
+                Log.w(TAG, "Verify failed: ${result.error}")
             }
 
             result
         } catch (e: Exception) {
-            Log.e(TAG, "Verify session failed: ${e.message}")
+            Log.e(TAG, "Verify session error: ${e.message}", e)
             null
         }
     }
 
-    /**
-     * Fast validation: check if existing session token is still valid.
-     * Call on: random actions, background checks.
-     */
     suspend fun validateToken(): Boolean {
         return try {
-            val accessToken = supabaseClient.auth.currentAccessTokenOrNull() ?: return false
             val sessionToken = preferencesManager.getDeviceSessionToken() ?: return false
             val deviceId = getDeviceId()
 
@@ -112,28 +113,20 @@ class SecurityManager @Inject constructor(
                 put("device_id", deviceId)
             }
 
-            val response = supabaseClient.functions.invoke(
-                function = "validate-token",
-                body = body,
-                headers = Headers.build {
-                    append(HttpHeaders.Authorization, "Bearer $accessToken")
-                },
-            )
+            val response = supabaseClient.functions.invoke("validate-token") {
+                this.body = body
+            }
 
-            val responseBody = response.body<String>()
+            val responseBody: String = response.body()
             val result = json.decodeFromString<ValidateTokenResponse>(responseBody)
-
-            Log.d(TAG, "Token validation: ${if (result.valid) "✅" else "❌"}")
+            Log.d(TAG, "Validate: ${if (result.valid) "✅" else "❌"}")
             result.valid
         } catch (e: Exception) {
-            Log.e(TAG, "Validate token failed: ${e.message}")
+            Log.e(TAG, "Validate error: ${e.message}")
             false
         }
     }
 
-    /**
-     * Clear device session (on logout).
-     */
     suspend fun clearSession() {
         preferencesManager.clearDeviceSessionToken()
     }
