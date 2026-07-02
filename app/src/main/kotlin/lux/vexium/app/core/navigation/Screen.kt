@@ -7,6 +7,7 @@ sealed interface Screen {
     @Serializable data object SplashAlt : Screen
 
     @Serializable data object Welcome : Screen
+    @Serializable data object TelegramCode : Screen
     @Serializable data object SetupUsername : Screen
     @Serializable data object CreatePin : Screen
     @Serializable data object VerifyPin : Screen

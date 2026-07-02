@@ -30,6 +30,7 @@ import lux.vexium.app.core.common.Constants
 import lux.vexium.app.core.components.FullScreenLoading
 import lux.vexium.app.core.components.ModalLoading
 import lux.vexium.app.feature.auth.presentation.AccountCreatedScreen
+import lux.vexium.app.feature.auth.presentation.TelegramCodeScreen
 import lux.vexium.app.feature.auth.presentation.AuthStep
 import lux.vexium.app.feature.auth.presentation.AuthViewModel
 import lux.vexium.app.feature.auth.presentation.BiometricHelper
@@ -70,10 +71,10 @@ fun VexiumNavHost(
 
     // ── Check for pending Telegram deep link code ──
     LaunchedEffect(Unit) {
-        val code = mainActivity?.consumeTelegramCode()
+        val code = mainActivity?.pendingTelegramCode
         if (code != null) {
-            Log.d(TAG, "Processing Telegram code from deep link")
-            authViewModel.handleTelegramCode(code)
+            Log.d(TAG, "Telegram deep link code found, navigating to code screen")
+            navController.navigate(Screen.TelegramCode)
         }
     }
 
@@ -206,14 +207,35 @@ fun VexiumNavHost(
                             googleSignInState.startFlow()
                         },
                         onTelegramClick = {
-                            // Open Telegram bot
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Constants.TELEGRAM_BOT_URL))
-                            context.startActivity(intent)
+                            // Open Telegram bot, then navigate to code entry screen
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Constants.TELEGRAM_BOT_URL))
+                                context.startActivity(intent)
+                            } catch (_: Exception) { }
+                            // Navigate to code entry screen — user will come back here
+                            navController.navigate(Screen.TelegramCode)
                         },
                         onEmailClick = { },
                         onGuestClick = {
                             navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } }
                         },
+                    )
+                }
+
+                composable<Screen.TelegramCode> {
+                    // Check if deep link brought a code
+                    val deepLinkCode = mainActivity?.consumeTelegramCode()
+
+                    if (deepLinkCode != null) {
+                        // Auto-submit the code from deep link
+                        LaunchedEffect(deepLinkCode) {
+                            authViewModel.handleTelegramCode(deepLinkCode)
+                        }
+                    }
+
+                    TelegramCodeScreen(
+                        onSubmitCode = { code -> authViewModel.handleTelegramCode(code) },
+                        onBackClick = { navController.popBackStack() },
                     )
                 }
 
