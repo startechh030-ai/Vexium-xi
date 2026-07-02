@@ -16,6 +16,7 @@ import lux.vexium.app.data.local.PreferencesManager
 import lux.vexium.app.feature.auth.data.AuthRepository
 import lux.vexium.app.feature.auth.data.ProfileUpdate
 import lux.vexium.app.feature.auth.data.SecurityManager
+import lux.vexium.app.feature.auth.data.TelegramAuthRepository
 import javax.inject.Inject
 
 private const val TAG = "VexiumAuth"
@@ -59,6 +60,7 @@ class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val preferencesManager: PreferencesManager,
     private val securityManager: SecurityManager,
+    private val telegramAuthRepository: TelegramAuthRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -287,6 +289,52 @@ class AuthViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             isLoading = false, step = AuthStep.IDLE, error = message, freshLogin = false,
         )
+    }
+
+    // ── Telegram Auth ──
+
+    fun handleTelegramCode(code: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                loadingMessage = "Verifying Telegram...",
+                step = AuthStep.AUTHENTICATING,
+            )
+            try {
+                val response = telegramAuthRepository.verifyCode(code)
+
+                if (!response.success) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        step = AuthStep.IDLE,
+                        error = response.error ?: "Verification failed",
+                    )
+                    return@launch
+                }
+
+                // Complete sign-in with the magic link token
+                if (response.token != null && response.type != null) {
+                    _uiState.value = _uiState.value.copy(loadingMessage = "Signing in...")
+                    telegramAuthRepository.completeSignIn(response.token, response.type)
+                    // Session observer will handle the rest (processAuthenticatedUser)
+                    isFreshSignIn = true
+                } else {
+                    // Fallback — couldn't get magic link, show error
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        step = AuthStep.IDLE,
+                        error = "Sign-in method not available. Try Google instead.",
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Telegram auth error: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    step = AuthStep.IDLE,
+                    error = "Telegram auth failed: ${e.message}",
+                )
+            }
+        }
     }
 
     fun onGoogleSignInCancelled() {

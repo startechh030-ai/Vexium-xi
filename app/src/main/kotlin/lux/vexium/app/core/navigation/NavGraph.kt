@@ -1,5 +1,7 @@
 package lux.vexium.app.core.navigation
 
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,8 @@ import androidx.navigation.compose.rememberNavController
 import io.github.jan.supabase.compose.auth.ComposeAuth
 import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
 import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
+import lux.vexium.app.MainActivity
+import lux.vexium.app.core.common.Constants
 import lux.vexium.app.core.components.FullScreenLoading
 import lux.vexium.app.core.components.ModalLoading
 import lux.vexium.app.feature.auth.presentation.AccountCreatedScreen
@@ -56,6 +60,7 @@ fun VexiumNavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val context = LocalContext.current
     val activity = context as? FragmentActivity
+    val mainActivity = context as? MainActivity
     val currentRouteName = navBackStackEntry?.destination?.route
 
     val authViewModel: AuthViewModel = hiltViewModel()
@@ -63,9 +68,17 @@ fun VexiumNavHost(
 
     var showUsernameSheet by remember { mutableStateOf(false) }
 
+    // ── Check for pending Telegram deep link code ──
+    LaunchedEffect(Unit) {
+        val code = mainActivity?.consumeTelegramCode()
+        if (code != null) {
+            Log.d(TAG, "Processing Telegram code from deep link")
+            authViewModel.handleTelegramCode(code)
+        }
+    }
+
     // ════════════════════════════
     // STEP-DRIVEN NAVIGATION
-    // Only triggers on steps that need navigation
     // ════════════════════════════
     LaunchedEffect(authState.step) {
         Log.d(TAG, "Step: ${authState.step}")
@@ -79,7 +92,6 @@ fun VexiumNavHost(
 
             AuthStep.VERIFY_PIN -> {
                 showUsernameSheet = false
-                // Only navigate if not already on VerifyPin
                 val onPin = currentRouteName?.contains(Screen.VerifyPin::class.qualifiedName ?: "") == true
                 if (!onPin) {
                     navController.navigate(Screen.VerifyPin) { popUpTo(0) { inclusive = true } }
@@ -96,7 +108,6 @@ fun VexiumNavHost(
             }
 
             AuthStep.IDLE -> {
-                // Make sure we're on welcome
                 val onWelcome = currentRouteName?.contains(Screen.Welcome::class.qualifiedName ?: "") == true
                 val onSplash = currentRouteName?.contains("Splash") == true
                 if (!onWelcome && !onSplash) {
@@ -104,7 +115,7 @@ fun VexiumNavHost(
                 }
             }
 
-            else -> { /* INITIALIZING, AUTHENTICATING, CHECKING_PROFILE, BIOMETRIC_SETUP — handled by overlays */ }
+            else -> { }
         }
     }
 
@@ -177,36 +188,32 @@ fun VexiumNavHost(
 
                 composable<Screen.SplashAlt> {
                     val postDest = authState.postSplashDestination
-
                     SplashScreenAlt(onSplashFinished = {
-                        // If auth still resolving, wait a bit more
-                        if (postDest != null) {
+                        val dest = if (postDest != null) {
                             authViewModel.onSplashCompleted()
-                            navigateAfterSplash(navController, postDest)
+                            postDest
                         } else {
-                            // Auth not resolved yet — default to welcome
-                            // The LaunchedEffect on authState.step will redirect if needed
-                            val fallback = authViewModel.onSplashCompleted()
-                            navigateAfterSplash(navController, fallback)
+                            authViewModel.onSplashCompleted()
                         }
+                        navigateAfterSplash(navController, dest)
                     })
-
-                    // If splash animation finished but auth resolves AFTER,
-                    // navigate immediately when destination becomes available
-                    if (postDest != null && currentRouteName?.contains("SplashAlt") == true) {
-                        LaunchedEffect(postDest) {
-                            // Small delay to let splash finish its fade-out
-                            kotlinx.coroutines.delay(100)
-                        }
-                    }
                 }
 
                 composable<Screen.Welcome> {
                     WelcomeScreen(
-                        onGoogleClick = { authViewModel.onGoogleSignInStarted(); googleSignInState.startFlow() },
-                        onTelegramClick = { },
+                        onGoogleClick = {
+                            authViewModel.onGoogleSignInStarted()
+                            googleSignInState.startFlow()
+                        },
+                        onTelegramClick = {
+                            // Open Telegram bot
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Constants.TELEGRAM_BOT_URL))
+                            context.startActivity(intent)
+                        },
                         onEmailClick = { },
-                        onGuestClick = { navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } } },
+                        onGuestClick = {
+                            navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } }
+                        },
                     )
                 }
 

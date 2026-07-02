@@ -9,6 +9,10 @@ object Constants {
     // This is the WEB client ID (not the Android one)
     const val GOOGLE_WEB_CLIENT_ID = "172761343224-3bgt5d0fklpnr51q25gddtho00se3cc2.apps.googleusercontent.com"
 
+    // ── Telegram ──
+    const val TELEGRAM_BOT_USERNAME = "vexcchain_bot"
+    const val TELEGRAM_BOT_URL = "https://t.me/vexcchain_bot"
+
     // ── App ──
     const val BASE_URL = "https://api.vexium.app/"
     const val PREFERENCES_NAME = "vexium_preferences"
