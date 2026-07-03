@@ -12,12 +12,14 @@ import io.github.jan.supabase.compose.auth.ComposeAuth
 import io.github.jan.supabase.compose.auth.composeAuth
 import io.github.jan.supabase.compose.auth.googleNativeLogin
 import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import lux.obris.app.core.common.Constants
 import javax.inject.Singleton
 
+/**
+ * Supabase DI module — provides client, auth, postgrest, compose auth.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object SupabaseModule {
@@ -35,24 +37,18 @@ object SupabaseModule {
                 host = "auth-callback"
             }
             install(Postgrest)
-            install(Functions)
             install(ComposeAuth) {
-                googleNativeLogin(
-                    serverClientId = Constants.GOOGLE_WEB_CLIENT_ID,
-                )
+                googleNativeLogin(serverClientId = Constants.GOOGLE_WEB_CLIENT_ID)
             }
         }
     }
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideAuth(client: SupabaseClient): Auth = client.auth
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun providePostgrest(client: SupabaseClient): Postgrest = client.postgrest
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideComposeAuth(client: SupabaseClient): ComposeAuth = client.composeAuth
 }
