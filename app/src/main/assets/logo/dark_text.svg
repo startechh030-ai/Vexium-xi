@@ -1,36 +1,28 @@
-<svg width="700" height="280" viewBox="0 0 700 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="500" height="200" viewBox="0 0 500 200" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="vexiumGradient" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="objectBoundingBox">
-      <stop offset="0%" stop-color="#F0F0F0" />
-      <stop offset="8%" stop-color="#DCDCDC" />
-      <stop offset="18%" stop-color="#C8C8C8" />
-      <stop offset="30%" stop-color="#A8A8A8" />
-      <stop offset="42%" stop-color="#808080" />
-      <stop offset="54%" stop-color="#4A4A4A" />
-      <stop offset="65%" stop-color="#1E1E1E" />
-      <stop offset="78%" stop-color="#080808" />
-      <stop offset="100%" stop-color="#000000" />
+    <linearGradient id="obrisGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#80F0FF" />
+      <stop offset="15%" stop-color="#00E5FF" />
+      <stop offset="40%" stop-color="#00B8D4" />
+      <stop offset="60%" stop-color="#BB86FC" />
+      <stop offset="80%" stop-color="#7C4DFF" />
+      <stop offset="100%" stop-color="#4A148C" />
     </linearGradient>
-    <linearGradient id="metallicShine" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="objectBoundingBox">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.75" />
-      <stop offset="12%" stop-color="#FFFFFF" stop-opacity="0.45" />
-      <stop offset="28%" stop-color="#FFFFFF" stop-opacity="0.15" />
-      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.03" />
-      <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0.00" />
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.20" />
+    <linearGradient id="obrisShine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.6" />
+      <stop offset="20%" stop-color="#FFFFFF" stop-opacity="0.2" />
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.2" />
     </linearGradient>
-    <linearGradient id="softGlow" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="objectBoundingBox">
-      <stop offset="85%" stop-color="#FFFFFF" stop-opacity="0" />
-      <stop offset="95%" stop-color="#FFFFFF" stop-opacity="0.12" />
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.25" />
-    </linearGradient>
-    <filter id="depthShadow" x="-2%" y="-2%" width="104%" height="108%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.35" />
+    <filter id="glow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 0 0 0 0.9  0 0 0 0 1  0 0 0 0.3 0" result="colored" />
+      <feMerge>
+        <feMergeNode in="colored" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
     </filter>
   </defs>
-  <g filter="url(#depthShadow)">
-    <text x="350" y="170" font-family="'Inter', 'Segoe UI', Arial Black, Helvetica, sans-serif" font-size="196" font-weight="900" fill="url(#vexiumGradient)" text-anchor="middle" dominant-baseline="middle" letter-spacing="-6px" paint-order="stroke fill">Vexium</text>
-  </g>
-  <text x="350" y="170" font-family="'Inter', 'Segoe UI', Arial Black, Helvetica, sans-serif" font-size="196" font-weight="900" fill="url(#metallicShine)" text-anchor="middle" dominant-baseline="middle" letter-spacing="-6px" opacity="0.8">Vexium</text>
-  <text x="350" y="170" font-family="'Inter', 'Segoe UI', Arial Black, Helvetica, sans-serif" font-size="196" font-weight="900" fill="url(#softGlow)" text-anchor="middle" dominant-baseline="middle" letter-spacing="-6px">Vexium</text>
+  <text x="250" y="120" font-family="'Inter', Arial Black, sans-serif" font-size="140" font-weight="900" fill="url(#obrisGrad)" text-anchor="middle" dominant-baseline="middle" letter-spacing="-4px" filter="url(#glow)">Obris</text>
+  <text x="250" y="120" font-family="'Inter', Arial Black, sans-serif" font-size="140" font-weight="900" fill="url(#obrisShine)" text-anchor="middle" dominant-baseline="middle" letter-spacing="-4px" opacity="0.7">Obris</text>
 </svg>

@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "lux.vexium.app"
+    namespace = "lux.obris.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     signingConfigs {
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "lux.vexium.app"
+        applicationId = "lux.obris.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1

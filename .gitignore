@@ -7,5 +7,4 @@
 /captures
 .externalNativeBuild
 .cxx
-security/
-security/*.json
+local.properties

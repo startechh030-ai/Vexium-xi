@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Vexium"
+rootProject.name = "Obris"
 include(":app")
