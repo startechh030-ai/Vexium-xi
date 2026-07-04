@@ -59,6 +59,9 @@ appcompat = "1.7.0"
 # Splash Screen
 splashscreen = "1.0.1"
 
+# Media3 (ExoPlayer for video splash)
+media3 = "1.10.1"
+
 # Biometric
 biometric = "1.1.0"
 
@@ -127,6 +130,10 @@ lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", versio
 # Splash Screen
 androidx-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+
+# Media3 ExoPlayer
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 
 # Supabase
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }

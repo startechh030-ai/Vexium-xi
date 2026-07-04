@@ -16,10 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import lux.obris.app.core.theme.NeonCyan
-import lux.obris.app.core.theme.SpaceBlue
+import lux.obris.app.core.theme.BrandOrange
 
-/** Bottom nav items for Obris */
+/** Bottom nav item data */
 data class BottomNavItem(
     val label: String,
     val selectedIcon: ImageVector,
@@ -27,20 +26,22 @@ data class BottomNavItem(
     val route: Screen,
 )
 
+/** Bottom nav items for Obris */
 val bottomNavItems = listOf(
     BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, Screen.Home),
     BottomNavItem("Games", Icons.Filled.SportsEsports, Icons.Outlined.SportsEsports, Screen.Games),
     BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.Person, Screen.Profile),
 )
 
+/** Obris bottom navigation bar */
 @Composable
 fun ObrisBottomBar(
     currentRoute: Screen?,
     onNavigate: (Screen) -> Unit,
 ) {
     NavigationBar(
-        containerColor = Color(0xFF060610),
-        contentColor = NeonCyan,
+        containerColor = Color(0xFF0E080C),
+        contentColor = BrandOrange,
     ) {
         bottomNavItems.forEach { item ->
             val isSelected = currentRoute == item.route
@@ -53,15 +54,13 @@ fun ObrisBottomBar(
                         contentDescription = item.label,
                     )
                 },
-                label = {
-                    Text(item.label, style = MaterialTheme.typography.labelSmall)
-                },
+                label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = NeonCyan,
-                    selectedTextColor = NeonCyan,
-                    unselectedIconColor = Color(0xFF555570),
-                    unselectedTextColor = Color(0xFF555570),
-                    indicatorColor = NeonCyan.copy(alpha = 0.10f),
+                    selectedIconColor = BrandOrange,
+                    selectedTextColor = BrandOrange,
+                    unselectedIconColor = Color(0xFF5A4A50),
+                    unselectedTextColor = Color(0xFF5A4A50),
+                    indicatorColor = BrandOrange.copy(alpha = 0.10f),
                 ),
             )
         }

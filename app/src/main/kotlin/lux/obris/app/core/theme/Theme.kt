@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// ── Cyberpunk Space Dark Scheme ──
+// ── Obris dark color scheme — orange/cyan/purple on deep dark ──
 private val ObrisDarkScheme = darkColorScheme(
     primary = ObrisPrimary,
     onPrimary = ObrisOnPrimary,
@@ -39,21 +39,19 @@ private val ObrisDarkScheme = darkColorScheme(
     inverseSurface = ObrisInverseSurface,
     inverseOnSurface = ObrisInverseOnSurface,
     inversePrimary = ObrisInversePrimary,
-    surfaceDim = Color(0xFF000000),
+    surfaceDim = Color(0xFF060406),
     surfaceBright = ObrisSurfaceVariant,
-    surfaceContainerLowest = Color(0xFF000000),
-    surfaceContainerLow = Color(0xFF060610),
+    surfaceContainerLowest = Color(0xFF060406),
+    surfaceContainerLow = Color(0xFF0E0A0C),
     surfaceContainer = ObrisSurfaceContainer,
     surfaceContainerHigh = ObrisSurfaceContainerHigh,
     surfaceContainerHighest = ObrisSurfaceContainerHighest,
 )
 
-/** Theme mode — dark only for now */
+/** Theme mode enum — dark only for now */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-/**
- * Obris app theme — cyberpunk space, dark only.
- */
+/** Obris app theme — vibrant orange/cyan on deep dark */
 @Composable
 fun ObrisTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,

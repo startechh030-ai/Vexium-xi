@@ -45,16 +45,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import lux.obris.app.R
 import lux.obris.app.core.components.ObrisLogo
-import lux.obris.app.core.theme.NeonCyan
-import lux.obris.app.core.theme.NeonPurple
-import lux.obris.app.core.theme.NeonPink
-import lux.obris.app.core.theme.SpaceBlue
+import lux.obris.app.core.theme.BrandCyan
+import lux.obris.app.core.theme.BrandOrange
+import lux.obris.app.core.theme.BrandOrangeLight
+import lux.obris.app.core.theme.BrandPurple
 import kotlin.random.Random
 
 /**
- * Welcome / Auth screen — landscape layout.
- * Left side: Logo + branding with space background.
- * Right side: Auth buttons.
+ * Welcome screen — landscape layout.
+ * Left: Logo + branding with energy particles.
+ * Right: Auth buttons.
  */
 @Composable
 fun WelcomeScreen(
@@ -62,71 +62,78 @@ fun WelcomeScreen(
     onEmailClick: () -> Unit = {},
     onGuestClick: () -> Unit = {},
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "space")
+    // ── Ambient animations ──
+    val infiniteTransition = rememberInfiniteTransition(label = "welcome")
     val drift by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Restart),
         label = "drift",
     )
     val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.8f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Reverse),
+        initialValue = 0.7f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Reverse),
         label = "pulse",
     )
 
-    // Stars — generated once
-    val stars = remember { List(80) { StarPoint(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 2f + 0.5f, Random.nextFloat(), Random.nextFloat()) } }
+    // ── Particles ──
+    val particles = remember {
+        List(50) {
+            FloatArray(5).also { a ->
+                a[0] = Random.nextFloat()  // x
+                a[1] = Random.nextFloat()  // y
+                a[2] = Random.nextFloat() * 2f + 0.5f  // size
+                a[3] = Random.nextFloat()  // brightness
+                a[4] = Random.nextFloat()  // offset
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color(0xFF0A0608)),
     ) {
-        // ── Space background with stars + nebula ──
+        // ── Ambient background — energy glow + particles ──
         Canvas(modifier = Modifier.fillMaxSize().clipToBounds()) {
             val w = size.width; val h = size.height
 
-            // Nebula glow — purple/cyan
+            // Orange energy glow (top-left)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(NeonPurple.copy(alpha = 0.08f * pulse), Color.Transparent),
-                    center = Offset(w * 0.25f, h * 0.3f), radius = w * 0.35f,
+                    colors = listOf(BrandOrange.copy(alpha = 0.10f * pulse), Color.Transparent),
+                    center = Offset(w * 0.2f, h * 0.25f), radius = w * 0.30f,
                 ),
-                radius = w * 0.35f, center = Offset(w * 0.25f, h * 0.3f),
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(NeonCyan.copy(alpha = 0.06f * pulse), Color.Transparent),
-                    center = Offset(w * 0.15f, h * 0.7f), radius = w * 0.25f,
-                ),
-                radius = w * 0.25f, center = Offset(w * 0.15f, h * 0.7f),
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(NeonPink.copy(alpha = 0.04f * pulse), Color.Transparent),
-                    center = Offset(w * 0.8f, h * 0.5f), radius = w * 0.2f,
-                ),
-                radius = w * 0.2f, center = Offset(w * 0.8f, h * 0.5f),
+                radius = w * 0.30f, center = Offset(w * 0.2f, h * 0.25f),
             )
 
-            // Stars
-            stars.forEach { s ->
-                val t = ((drift + s.offset) % 1f)
-                val alpha = (s.brightness * 0.3f + t * 0.5f * s.brightness).coerceIn(0f, 0.7f)
-                drawCircle(Color.White.copy(alpha = alpha), s.size, Offset(s.x * w, s.y * h))
-                // Shooting trails for bright stars
-                if (s.brightness > 0.75f && t > 0.6f) {
-                    drawLine(
-                        Color.White.copy(alpha = alpha * 0.2f),
-                        Offset(s.x * w, s.y * h),
-                        Offset(s.x * w - s.size * 12f, s.y * h + s.size * 4f),
-                        strokeWidth = 0.6f,
-                    )
-                }
+            // Cyan energy glow (bottom-right)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(BrandCyan.copy(alpha = 0.06f * pulse), Color.Transparent),
+                    center = Offset(w * 0.8f, h * 0.75f), radius = w * 0.25f,
+                ),
+                radius = w * 0.25f, center = Offset(w * 0.8f, h * 0.75f),
+            )
+
+            // Purple energy (center)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(BrandPurple.copy(alpha = 0.05f * pulse), Color.Transparent),
+                    center = Offset(w * 0.5f, h * 0.5f), radius = w * 0.20f,
+                ),
+                radius = w * 0.20f, center = Offset(w * 0.5f, h * 0.5f),
+            )
+
+            // Particles — orange and cyan sparks
+            particles.forEach { p ->
+                val t = ((drift + p[4]) % 1f)
+                val alpha = (p[3] * 0.3f + t * 0.4f * p[3]).coerceIn(0f, 0.6f)
+                val color = if (p[3] > 0.5f) BrandOrange else BrandCyan
+                drawCircle(color.copy(alpha = alpha), p[2], Offset(p[0] * w, p[1] * h))
             }
         }
 
-        // ── Landscape layout: Left = branding, Right = auth ──
+        // ── Landscape layout ──
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -135,34 +142,33 @@ fun WelcomeScreen(
         ) {
             // ── LEFT: Logo + tagline ──
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
+                // Logo
                 ObrisLogo()
-                Spacer(modifier = Modifier.height(12.dp))
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Tagline
                 Text(
                     text = "PLAY  •  COMPETE  •  WIN",
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     letterSpacing = 4.sp,
-                    color = NeonCyan.copy(alpha = 0.5f),
+                    color = BrandOrange.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center,
                 )
             }
 
             // ── RIGHT: Auth buttons ──
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(start = 24.dp),
+                modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                // Google
+                // Google button
                 AuthButton(
                     iconRes = R.drawable.ic_google,
                     text = "Continue with Google",
@@ -171,43 +177,45 @@ fun WelcomeScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Email
+                // Email button
                 AuthButton(
                     iconRes = R.drawable.ic_email,
                     text = "Continue with Email",
                     onClick = onEmailClick,
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Divider
                 Row(Modifier.fillMaxWidth(0.8f), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f).height(0.5.dp).background(Color(0xFF1A1A30)))
-                    Text("or", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall, color = Color(0xFF3A3A55))
-                    Box(Modifier.weight(1f).height(0.5.dp).background(Color(0xFF1A1A30)))
+                    Box(Modifier.weight(1f).height(0.5.dp).background(BrandOrange.copy(alpha = 0.12f)))
+                    Text("or", Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF5A4A50))
+                    Box(Modifier.weight(1f).height(0.5.dp).background(BrandOrange.copy(alpha = 0.12f)))
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Guest
                 Text(
-                    text = "Try as Guest",
+                    text = "Play as Guest",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = NeonCyan.copy(alpha = 0.6f),
+                    color = BrandOrange.copy(alpha = 0.7f),
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(remember { MutableInteractionSource() }, ripple(bounded = true), onClick = onGuestClick)
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Legal
                 Text(
                     text = "By continuing, you agree to our Terms & Privacy Policy",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF222240),
+                    color = Color(0xFF2A1E24),
                     textAlign = TextAlign.Center,
                     lineHeight = 14.sp,
                 )
@@ -216,10 +224,7 @@ fun WelcomeScreen(
     }
 }
 
-// ── Star data ──
-private data class StarPoint(val x: Float, val y: Float, val size: Float, val brightness: Float, val offset: Float)
-
-// ── Auth button — cyberpunk style ──
+/** Auth button — dark with orange/cyan gradient border */
 @Composable
 private fun AuthButton(iconRes: Int, text: String, onClick: () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
@@ -228,8 +233,8 @@ private fun AuthButton(iconRes: Int, text: String, onClick: () -> Unit) {
             .fillMaxWidth(0.85f)
             .height(50.dp)
             .clip(shape)
-            .background(Color(0xFF0A0A16))
-            .border(0.8.dp, Brush.linearGradient(listOf(NeonCyan.copy(alpha = 0.15f), NeonPurple.copy(alpha = 0.08f))), shape)
+            .background(Color(0xFF120C10))
+            .border(0.8.dp, Brush.linearGradient(listOf(BrandOrange.copy(alpha = 0.20f), BrandCyan.copy(alpha = 0.10f))), shape)
             .clickable(remember { MutableInteractionSource() }, ripple(bounded = true), onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -237,6 +242,6 @@ private fun AuthButton(iconRes: Int, text: String, onClick: () -> Unit) {
     ) {
         Icon(painterResource(iconRes), null, Modifier.size(20.dp), tint = Color.Unspecified)
         Spacer(Modifier.width(12.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color(0xFFCCCCDD))
+        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color(0xFFD0C4C8))
     }
 }
