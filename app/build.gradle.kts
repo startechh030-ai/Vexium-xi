@@ -134,10 +134,6 @@ dependencies {
     // ── Splash Screen ──
     implementation(libs.androidx.splashscreen)
 
-    // ── Media3 ExoPlayer (video splash) ──
-    implementation(libs.media3.exoplayer)
-    implementation(libs.media3.ui)
-
     // ── Biometric ──
     implementation(libs.androidx.biometric)
 

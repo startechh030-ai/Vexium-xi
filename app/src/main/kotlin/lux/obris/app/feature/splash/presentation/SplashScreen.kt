@@ -1,273 +1,336 @@
 package lux.obris.app.feature.splash.presentation
 
-import android.content.Context
-import android.net.Uri
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import androidx.annotation.OptIn
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
+// ── Brand colors ──
+private val OrangeBright = Color(0xFFFF8C00)
+private val OrangeLight = Color(0xFFFFAA33)
+private val OrangeDark = Color(0xFFCC6600)
+private val CyanAccent = Color(0xFF00E5FF)
+private val DeepDark = Color(0xFF0A0608)
+private val WarmDark = Color(0xFF1A0E14)
+
 /**
- * Obris splash screen — two phases in one composable:
+ * Obris splash screen — pure Compose Canvas, no video.
+ * Inspired by Farlight 84 but with Obris orange/cyan brand.
  *
- * Phase 1 (0-2s): Axiom studio logo
- *   - Logo appears centered, slides left ~30%, text "AXIOM" fades up
- *   - Fades out
- *
- * Phase 2 (2-7s): Obris video splash
- *   - Plays the best-fit .mp4 from res/raw
- *   - Full screen, no crop, fits device
- *   - When done → onSplashFinished()
+ * Timeline:
+ *  Phase 0 (0.0-0.3s): Black screen
+ *  Phase 1 (0.3-1.2s): Obris diamond logo scales up from center
+ *  Phase 2 (1.2-1.8s): Logo pulses, orange energy burst fills screen
+ *  Phase 3 (1.8-2.5s): Flash fades, logo shrinks to left, "OBRIS" text slides in
+ *  Phase 4 (2.5-4.0s): Dark purple/orange bg, large watermark text, light sweep
+ *  Phase 5 (4.0-4.5s): Hold final frame
+ *  Phase 6 (4.5-5.0s): Fade out → navigate
  */
-@OptIn(UnstableApi::class)
 @Composable
 fun SplashScreen(
     onSplashFinished: () -> Unit,
 ) {
-    val context = LocalContext.current
-
-    // ── State machine ──
-    // 0 = Axiom intro, 1 = Axiom fade out, 2 = Video playing, 3 = Done
     var phase by remember { mutableIntStateOf(0) }
-    var showAxiom by remember { mutableStateOf(true) }
-    var showVideo by remember { mutableStateOf(false) }
 
-    // ── Axiom animations ──
-    val logoOffsetX = remember { Animatable(0f) }    // 0 = center, -1 = left
-    val textAlpha = remember { Animatable(0f) }
-    val axiomAlpha = remember { Animatable(1f) }
+    // ── Animation values ──
+    val logoScale = remember { Animatable(0f) }         // 0 = invisible, 1 = normal, 3 = huge
+    val logoAlpha = remember { Animatable(0f) }
+    val flashAlpha = remember { Animatable(0f) }        // Orange flash
+    val textAlpha = remember { Animatable(0f) }         // "OBRIS" text
+    val logoOffsetX = remember { Animatable(0f) }       // 0 = center, -1 = left
+    val bgTransition = remember { Animatable(0f) }      // 0 = dark, 1 = purple/orange bg
+    val sweepProgress = remember { Animatable(0f) }     // Light sweep across bg
+    val watermarkAlpha = remember { Animatable(0f) }    // Large bg watermark
+    val screenAlpha = remember { Animatable(1f) }       // Final fade out
+    val loadingAlpha = remember { Animatable(0f) }      // "Loading..." text
 
-    // ── Pick best video for device aspect ratio ──
-    val config = LocalConfiguration.current
-    val screenWidth = config.screenWidthDp
-    val screenHeight = config.screenHeightDp
-    val videoRes = remember {
-        pickBestVideo(screenWidth.toFloat() / screenHeight.toFloat())
-    }
-
-    // ── ExoPlayer ──
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val uri = Uri.parse("android.resource://${context.packageName}/$videoRes")
-            setMediaItem(MediaItem.fromUri(uri))
-            playWhenReady = false // Don't play until phase 2
-            repeatMode = Player.REPEAT_MODE_OFF
-            volume = 0f // Silent
-            prepare()
-        }
-    }
-
-    // Listen for video end
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    phase = 3
-                }
-            }
-        }
-        exoPlayer.addListener(listener)
-        onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
-        }
-    }
-
-    // ── Animation timeline ──
+    // ── Timeline ──
     LaunchedEffect(Unit) {
-        // Phase 0: Axiom intro (2 seconds)
+        // Phase 0: Black (0.3s)
         delay(300)
 
-        // Logo slides left ~30%
-        logoOffsetX.animateTo(-0.3f, tween(500, easing = LinearEasing))
-
-        // Text fades in from below
-        textAlpha.animateTo(1f, tween(400))
-
-        // Hold for a moment
-        delay(600)
-
-        // Phase 1: Fade out Axiom
+        // Phase 1: Logo scales up from nothing (0.3-1.2s)
         phase = 1
-        axiomAlpha.animateTo(0f, tween(300))
+        logoAlpha.animateTo(1f, tween(200))
+        logoScale.animateTo(1f, tween(400, easing = LinearEasing))
+        delay(100)
+        // Dramatic scale up
+        logoScale.animateTo(2.8f, tween(400, easing = LinearEasing))
 
-        // Phase 2: Start video
-        showAxiom = false
-        showVideo = true
+        // Phase 2: Orange energy flash (1.2-1.8s)
         phase = 2
-        exoPlayer.play()
-    }
+        flashAlpha.animateTo(0.9f, tween(200))
+        delay(200)
+        flashAlpha.animateTo(0f, tween(300))
+        logoScale.animateTo(0.8f, tween(300))
 
-    // ── When video finishes (phase 3) → navigate ──
-    LaunchedEffect(phase) {
-        if (phase == 3) {
-            delay(200) // Brief pause
-            onSplashFinished()
-        }
+        // Phase 3: Logo slides left, text appears (1.8-2.5s)
+        phase = 3
+        logoOffsetX.animateTo(-1f, tween(350, easing = LinearEasing))
+        textAlpha.animateTo(1f, tween(300))
+        delay(200)
+
+        // Phase 4: Background transition + watermark + sweep (2.5-4.0s)
+        phase = 4
+        bgTransition.animateTo(1f, tween(400))
+        watermarkAlpha.animateTo(0.06f, tween(300))
+        loadingAlpha.animateTo(0.4f, tween(300))
+        sweepProgress.animateTo(1f, tween(1200, easing = LinearEasing))
+
+        // Phase 5: Hold (4.0-4.5s)
+        phase = 5
+        delay(500)
+
+        // Phase 6: Fade out (4.5-5.0s)
+        phase = 6
+        screenAlpha.animateTo(0f, tween(500))
+        onSplashFinished()
     }
 
     // ── UI ──
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(DeepDark),
         contentAlignment = Alignment.Center,
     ) {
-        // ── Phase 1: Axiom Studio Logo ──
-        if (showAxiom) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            x = (logoOffsetX.value * 120.dp.toPx()).toInt(),
-                            y = 0,
-                        )
-                    },
-                ) {
-                    // Axiom diamond logo
-                    Canvas(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .offset { IntOffset(0, 0) },
-                    ) {
-                        val w = size.width
-                        val h = size.height
-                        val cx = w / 2f
-                        val cy = h / 2f
-                        val s = w * 0.38f
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val alpha = screenAlpha.value
 
-                        // Diamond shape
-                        val diamond = Path().apply {
-                            moveTo(cx, cy - s)       // Top
-                            lineTo(cx + s, cy)        // Right
-                            lineTo(cx, cy + s)        // Bottom
-                            lineTo(cx - s, cy)        // Left
-                            close()
-                        }
-                        drawPath(
-                            diamond,
-                            color = Color.White.copy(alpha = axiomAlpha.value),
-                            style = Stroke(
-                                width = 2.5f,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round,
-                            ),
-                        )
-
-                        // Inner "A" mark
-                        val innerPath = Path().apply {
-                            moveTo(cx - s * 0.3f, cy + s * 0.15f)
-                            lineTo(cx, cy - s * 0.35f)
-                            lineTo(cx + s * 0.3f, cy + s * 0.15f)
-                        }
-                        drawPath(
-                            innerPath,
-                            color = Color.White.copy(alpha = axiomAlpha.value * 0.8f),
-                            style = Stroke(width = 1.8f, cap = StrokeCap.Round),
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // "AXIOM" text
-                    Text(
-                        text = "AXIOM",
-                        style = TextStyle(
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = textAlpha.value * axiomAlpha.value),
-                            letterSpacing = 8.sp,
+            // ── Background ──
+            // Dark → warm purple/orange gradient
+            if (bgTransition.value > 0f) {
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF1A0820).copy(alpha = bgTransition.value * alpha),
+                            Color(0xFF120610).copy(alpha = bgTransition.value * alpha),
+                            Color(0xFF1A0A08).copy(alpha = bgTransition.value * 0.5f * alpha),
                         ),
-                    )
-                }
+                        start = Offset(0f, 0f),
+                        end = Offset(w, h),
+                    ),
+                    size = Size(w, h),
+                )
+            }
+
+            // ── Large watermark text "OBRIS" in bg ──
+            if (watermarkAlpha.value > 0f) {
+                drawWatermark(cx, cy, w, watermarkAlpha.value * alpha)
+            }
+
+            // ── Light sweep (diagonal beam moving left to right) ──
+            if (sweepProgress.value > 0f && phase >= 4) {
+                val sweepX = -w * 0.3f + (w * 1.6f) * sweepProgress.value
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            OrangeBright.copy(alpha = 0.08f * alpha),
+                            Color.White.copy(alpha = 0.12f * alpha),
+                            OrangeBright.copy(alpha = 0.08f * alpha),
+                            Color.Transparent,
+                        ),
+                        startX = sweepX - w * 0.15f,
+                        endX = sweepX + w * 0.15f,
+                    ),
+                    size = Size(w, h),
+                )
+            }
+
+            // ── Orange energy flash ──
+            if (flashAlpha.value > 0f) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            OrangeLight.copy(alpha = flashAlpha.value * alpha),
+                            OrangeBright.copy(alpha = flashAlpha.value * 0.6f * alpha),
+                            Color.Transparent,
+                        ),
+                        center = Offset(cx, cy),
+                        radius = w * 0.8f,
+                    ),
+                    radius = w * 0.8f,
+                    center = Offset(cx, cy),
+                )
+            }
+
+            // ── Obris diamond logo ──
+            if (logoAlpha.value > 0f) {
+                val scale = logoScale.value
+                val offsetX = logoOffsetX.value * w * 0.18f
+                val logoSize = minOf(w, h) * 0.12f * scale
+                val logoCx = cx + offsetX
+                val logoCy = if (phase >= 3) cy else cy
+
+                drawObrisLogo(
+                    cx = logoCx,
+                    cy = logoCy,
+                    size = logoSize,
+                    alpha = logoAlpha.value * alpha,
+                    glowIntensity = if (phase == 2) 1f else 0.3f,
+                )
             }
         }
 
-        // ── Phase 2: Obris Video ──
-        AnimatedVisibility(
-            visible = showVideo && phase >= 2,
-            enter = fadeIn(tween(400)),
-            exit = fadeOut(tween(300)),
-        ) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = false
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        layoutParams = FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                        )
-                        setBackgroundColor(android.graphics.Color.BLACK)
-                        setShutterBackgroundColor(android.graphics.Color.BLACK)
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
+        // ── "OBRIS" text (appears in phase 3+) ──
+        if (textAlpha.value > 0f) {
+            Text(
+                text = "OBRIS",
+                style = TextStyle(
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White.copy(alpha = textAlpha.value * screenAlpha.value),
+                    letterSpacing = 8.sp,
+                ),
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        // ── "Loading..." at bottom (phase 4+) ──
+        if (loadingAlpha.value > 0f) {
+            Text(
+                text = "Loading...",
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = OrangeBright.copy(alpha = loadingAlpha.value * screenAlpha.value),
+                    letterSpacing = 2.sp,
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp),
             )
         }
     }
 }
 
 /**
- * Pick the best video resolution for the device aspect ratio.
- * Videos in res/raw: splash_16x9, splash_4x3, splash_5x4, splash_1x1
+ * Draw the Obris diamond logo — a stylized geometric diamond
+ * with orange gradient fill and cyan edge highlights.
  */
-private fun pickBestVideo(aspectRatio: Float): Int {
-    return when {
-        aspectRatio >= 1.6f -> lux.obris.app.R.raw.splash_16x9    // Wide screens (16:9, 18:9)
-        aspectRatio >= 1.2f -> lux.obris.app.R.raw.splash_4x3     // Standard (4:3)
-        aspectRatio >= 1.0f -> lux.obris.app.R.raw.splash_5x4     // Square-ish (5:4)
-        else -> lux.obris.app.R.raw.splash_1x1                     // Fallback square
+private fun DrawScope.drawObrisLogo(
+    cx: Float, cy: Float, size: Float,
+    alpha: Float, glowIntensity: Float,
+) {
+    // ── Outer glow ──
+    if (glowIntensity > 0.1f) {
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    OrangeBright.copy(alpha = 0.15f * glowIntensity * alpha),
+                    OrangeBright.copy(alpha = 0.05f * glowIntensity * alpha),
+                    Color.Transparent,
+                ),
+                center = Offset(cx, cy),
+                radius = size * 2f,
+            ),
+            radius = size * 2f,
+            center = Offset(cx, cy),
+        )
+    }
+
+    // ── Diamond shape ──
+    val diamond = Path().apply {
+        moveTo(cx, cy - size)          // Top
+        lineTo(cx + size * 0.85f, cy)  // Right
+        lineTo(cx, cy + size)          // Bottom
+        lineTo(cx - size * 0.85f, cy)  // Left
+        close()
+    }
+
+    // Fill with orange gradient
+    drawPath(
+        diamond,
+        brush = Brush.linearGradient(
+            colors = listOf(
+                OrangeLight.copy(alpha = alpha),
+                OrangeBright.copy(alpha = alpha),
+                OrangeDark.copy(alpha = alpha),
+            ),
+            start = Offset(cx - size, cy - size),
+            end = Offset(cx + size, cy + size),
+        ),
+    )
+
+    // Cyan edge highlight (top-left edge)
+    val highlight = Path().apply {
+        moveTo(cx, cy - size)
+        lineTo(cx - size * 0.85f, cy)
+    }
+    drawPath(
+        highlight,
+        color = CyanAccent.copy(alpha = alpha * 0.6f),
+        style = Stroke(width = 2.5f, cap = StrokeCap.Round),
+    )
+
+    // Inner cut — gives it a 3D folded look
+    val innerCut = Path().apply {
+        moveTo(cx - size * 0.15f, cy - size * 0.4f)
+        lineTo(cx + size * 0.35f, cy + size * 0.1f)
+        lineTo(cx, cy + size * 0.45f)
+        lineTo(cx - size * 0.35f, cy)
+        close()
+    }
+    drawPath(
+        innerCut,
+        color = Color(0xFF1A0A00).copy(alpha = alpha * 0.5f),
+    )
+}
+
+/**
+ * Draw large "OBRIS" watermark text in the background.
+ * Uses simple geometric shapes since Canvas can't draw text directly.
+ * We approximate with angled lines for the futuristic feel.
+ */
+private fun DrawScope.drawWatermark(cx: Float, cy: Float, width: Float, alpha: Float) {
+    // Large diagonal lines to simulate watermark text feel
+    val color = OrangeBright.copy(alpha = alpha)
+    val spacing = width * 0.08f
+
+    for (i in -3..3) {
+        val x = cx + i * spacing
+        drawLine(
+            color = color,
+            start = Offset(x - width * 0.02f, cy - width * 0.04f),
+            end = Offset(x + width * 0.02f, cy + width * 0.04f),
+            strokeWidth = width * 0.008f,
+            cap = StrokeCap.Round,
+        )
     }
 }
+
+
