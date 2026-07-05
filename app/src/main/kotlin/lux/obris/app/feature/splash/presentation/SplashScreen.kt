@@ -36,18 +36,17 @@ private val OrangeBright = Color(0xFFFF8C00)
 private val OrangeLight = Color(0xFFFFAA33)
 private val OrangeDark = Color(0xFFCC6600)
 private val CyanAccent = Color(0xFF00E5FF)
-private val DeepDark = Color(0xFF0A0608)
 
 /**
- * Obris splash screen — pure Compose Canvas animation.
+ * Obris splash screen — pure Compose Canvas.
+ * Lightweight, works on all screen sizes.
  *
  * Phase 0: Black
- * Phase 1: Diamond logo scales up from center
- * Phase 2: Orange energy burst
- * Phase 3: Logo slides left, "OBRIS" text appears
- * Phase 4: Dark bg with light sweep + loading text
- * Phase 5: Hold
- * Phase 6: Fade out → navigate
+ * Phase 1: Logo scales up
+ * Phase 2: Orange flash
+ * Phase 3: Logo slides left, text appears
+ * Phase 4: Background + sweep
+ * Phase 5: Fade out
  */
 @Composable
 fun SplashScreen(
@@ -60,109 +59,89 @@ fun SplashScreen(
     val flashAlpha = remember { Animatable(0f) }
     val textAlpha = remember { Animatable(0f) }
     val logoOffsetX = remember { Animatable(0f) }
-    val bgTransition = remember { Animatable(0f) }
-    val sweepProgress = remember { Animatable(0f) }
-    val screenAlpha = remember { Animatable(1f) }
+    val bgAlpha = remember { Animatable(0f) }
+    val sweepX = remember { Animatable(0f) }
+    val fadeOut = remember { Animatable(1f) }
     val loadingAlpha = remember { Animatable(0f) }
 
+    // ── Timeline ──
     LaunchedEffect(Unit) {
-        delay(300)
+        try {
+            delay(300)
 
-        // Phase 1: Logo appears + scales up
-        phase = 1
-        logoAlpha.animateTo(1f, tween(200))
-        logoScale.animateTo(1f, tween(400, easing = LinearEasing))
-        delay(100)
-        logoScale.animateTo(2.8f, tween(400, easing = LinearEasing))
+            // Phase 1: Logo appears
+            phase = 1
+            logoAlpha.animateTo(1f, tween(200))
+            logoScale.animateTo(1f, tween(400))
+            delay(100)
+            logoScale.animateTo(2.5f, tween(400))
 
-        // Phase 2: Flash
-        phase = 2
-        flashAlpha.animateTo(0.9f, tween(200))
-        delay(200)
-        flashAlpha.animateTo(0f, tween(300))
-        logoScale.animateTo(0.8f, tween(300))
+            // Phase 2: Flash
+            phase = 2
+            flashAlpha.animateTo(0.8f, tween(200))
+            delay(150)
+            flashAlpha.animateTo(0f, tween(300))
+            logoScale.animateTo(0.8f, tween(300))
 
-        // Phase 3: Logo left + text
-        phase = 3
-        logoOffsetX.animateTo(-1f, tween(350, easing = LinearEasing))
-        textAlpha.animateTo(1f, tween(300))
-        delay(200)
+            // Phase 3: Logo left + text
+            phase = 3
+            logoOffsetX.animateTo(-1f, tween(350))
+            textAlpha.animateTo(1f, tween(300))
+            delay(200)
 
-        // Phase 4: Bg + sweep
-        phase = 4
-        bgTransition.animateTo(1f, tween(400))
-        loadingAlpha.animateTo(0.4f, tween(300))
-        sweepProgress.animateTo(1f, tween(1200, easing = LinearEasing))
+            // Phase 4: Bg + sweep
+            phase = 4
+            bgAlpha.animateTo(1f, tween(400))
+            loadingAlpha.animateTo(0.4f, tween(300))
+            sweepX.animateTo(1f, tween(1200, easing = LinearEasing))
 
-        // Phase 5: Hold
-        phase = 5
-        delay(500)
+            // Phase 5: Hold + fade
+            delay(400)
+            phase = 5
+            fadeOut.animateTo(0f, tween(500))
 
-        // Phase 6: Fade
-        phase = 6
-        screenAlpha.animateTo(0f, tween(500))
-        onSplashFinished()
+            onSplashFinished()
+        } catch (e: Exception) {
+            // If any animation fails, still navigate
+            onSplashFinished()
+        }
     }
 
+    // ── UI ──
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DeepDark),
+            .background(Color(0xFF0A0608)),
     ) {
-        // ── Canvas: all animated graphics ──
+        // ── All Canvas drawing ──
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val cx = w / 2f
             val cy = h / 2f
-            val a = screenAlpha.value
+            val fo = fadeOut.value
 
-            // Background transition
-            if (bgTransition.value > 0f) {
+            // Dark bg transition
+            if (bgAlpha.value > 0f) {
                 drawRect(
                     brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF1A0820).copy(alpha = bgTransition.value * a),
-                            Color(0xFF120610).copy(alpha = bgTransition.value * a),
-                            Color(0xFF1A0A08).copy(alpha = bgTransition.value * 0.5f * a),
+                        listOf(
+                            Color(0xFF1A0820).copy(alpha = bgAlpha.value * fo),
+                            Color(0xFF120610).copy(alpha = bgAlpha.value * fo),
                         ),
-                        start = Offset.Zero,
-                        end = Offset(w, h),
+                        start = Offset.Zero, end = Offset(w, h),
                     ),
                     size = Size(w, h),
                 )
             }
 
-            // Watermark lines
-            if (bgTransition.value > 0.5f) {
-                val wAlpha = 0.05f * a
-                val spacing = w * 0.08f
-                for (i in -3..3) {
-                    val x = cx + i * spacing
-                    drawLine(
-                        OrangeBright.copy(alpha = wAlpha),
-                        Offset(x - w * 0.02f, cy - w * 0.04f),
-                        Offset(x + w * 0.02f, cy + w * 0.04f),
-                        strokeWidth = w * 0.006f,
-                        cap = StrokeCap.Round,
-                    )
-                }
-            }
-
-            // Light sweep
-            if (sweepProgress.value > 0f && phase >= 4) {
-                val sweepX = -w * 0.3f + (w * 1.6f) * sweepProgress.value
+            // Sweep light beam
+            if (sweepX.value > 0f && phase >= 4) {
+                val sx = -w * 0.2f + w * 1.4f * sweepX.value
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            OrangeBright.copy(alpha = 0.06f * a),
-                            Color.White.copy(alpha = 0.10f * a),
-                            OrangeBright.copy(alpha = 0.06f * a),
-                            Color.Transparent,
-                        ),
-                        startX = sweepX - w * 0.12f,
-                        endX = sweepX + w * 0.12f,
+                        listOf(Color.Transparent, OrangeBright.copy(alpha = 0.06f * fo), Color.White.copy(alpha = 0.08f * fo), OrangeBright.copy(alpha = 0.06f * fo), Color.Transparent),
+                        startX = sx - w * 0.1f, endX = sx + w * 0.1f,
                     ),
                     size = Size(w, h),
                 )
@@ -172,80 +151,68 @@ fun SplashScreen(
             if (flashAlpha.value > 0f) {
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(
-                            OrangeLight.copy(alpha = flashAlpha.value * a),
-                            OrangeBright.copy(alpha = flashAlpha.value * 0.5f * a),
-                            Color.Transparent,
-                        ),
-                        center = Offset(cx, cy),
-                        radius = w * 0.7f,
+                        listOf(OrangeLight.copy(alpha = flashAlpha.value * fo), OrangeBright.copy(alpha = flashAlpha.value * 0.4f * fo), Color.Transparent),
+                        center = Offset(cx, cy), radius = w * 0.6f,
                     ),
-                    radius = w * 0.7f,
-                    center = Offset(cx, cy),
+                    radius = w * 0.6f, center = Offset(cx, cy),
                 )
             }
 
-            // Logo
+            // Diamond logo
             if (logoAlpha.value > 0f) {
-                val scale = logoScale.value
-                val offsetX = logoOffsetX.value * w * 0.18f
-                val logoSize = minOf(w, h) * 0.10f * scale
-                drawObrisLogo(cx + offsetX, cy, logoSize, logoAlpha.value * a, if (phase == 2) 1f else 0.3f)
+                val s = minOf(w, h) * 0.10f * logoScale.value
+                val lx = cx + logoOffsetX.value * w * 0.18f
+                drawDiamond(lx, cy, s, logoAlpha.value * fo, if (phase == 2) 0.8f else 0.2f)
             }
         }
 
-        // ── "OBRIS" text — centered in Box ──
+        // ── "OBRIS" text ──
         if (textAlpha.value > 0f) {
-            Text(
-                text = "OBRIS",
-                style = TextStyle(
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White.copy(alpha = textAlpha.value * screenAlpha.value),
-                    letterSpacing = 8.sp,
-                ),
-                modifier = Modifier.align(Alignment.Center),
-            )
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "OBRIS",
+                    style = TextStyle(
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White.copy(alpha = textAlpha.value * fadeOut.value),
+                        letterSpacing = 8.sp,
+                    ),
+                )
+            }
         }
 
-        // ── "Loading..." at bottom ──
+        // ── "Loading..." ──
         if (loadingAlpha.value > 0f) {
-            Text(
-                text = "Loading...",
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = OrangeBright.copy(alpha = loadingAlpha.value * screenAlpha.value),
-                    letterSpacing = 2.sp,
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 28.dp),
-            )
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                Text(
+                    text = "Loading...",
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        color = OrangeBright.copy(alpha = loadingAlpha.value * fadeOut.value),
+                        letterSpacing = 2.sp,
+                    ),
+                    modifier = Modifier.padding(bottom = 28.dp),
+                )
+            }
         }
     }
 }
 
-/** Obris diamond logo — orange gradient + cyan highlight + inner fold */
-private fun DrawScope.drawObrisLogo(
-    cx: Float, cy: Float, s: Float, alpha: Float, glowIntensity: Float,
-) {
+/** Draw the Obris diamond logo */
+private fun DrawScope.drawDiamond(cx: Float, cy: Float, s: Float, alpha: Float, glow: Float) {
     // Glow
-    if (glowIntensity > 0.1f) {
+    if (glow > 0.05f) {
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(
-                    OrangeBright.copy(alpha = 0.12f * glowIntensity * alpha),
-                    Color.Transparent,
-                ),
+                listOf(OrangeBright.copy(alpha = 0.10f * glow * alpha), Color.Transparent),
                 center = Offset(cx, cy), radius = s * 2f,
             ),
             radius = s * 2f, center = Offset(cx, cy),
         )
     }
 
-    // Diamond shape
-    val diamond = Path().apply {
+    // Shape
+    val path = Path().apply {
         moveTo(cx, cy - s)
         lineTo(cx + s * 0.85f, cy)
         lineTo(cx, cy + s)
@@ -253,29 +220,26 @@ private fun DrawScope.drawObrisLogo(
         close()
     }
 
-    // Fill
+    // Orange gradient fill
     drawPath(
-        diamond,
+        path,
         brush = Brush.linearGradient(
-            colors = listOf(OrangeLight.copy(alpha = alpha), OrangeBright.copy(alpha = alpha), OrangeDark.copy(alpha = alpha)),
+            listOf(OrangeLight.copy(alpha = alpha), OrangeBright.copy(alpha = alpha), OrangeDark.copy(alpha = alpha)),
             start = Offset(cx - s, cy - s), end = Offset(cx + s, cy + s),
         ),
     )
 
-    // Cyan edge
-    val edge = Path().apply {
-        moveTo(cx, cy - s)
-        lineTo(cx - s * 0.85f, cy)
-    }
-    drawPath(edge, CyanAccent.copy(alpha = alpha * 0.6f), style = Stroke(2.5f, cap = StrokeCap.Round))
+    // Cyan top-left edge
+    val edge = Path().apply { moveTo(cx, cy - s); lineTo(cx - s * 0.85f, cy) }
+    drawPath(edge, CyanAccent.copy(alpha = alpha * 0.5f), style = Stroke(2f, cap = StrokeCap.Round))
 
-    // Inner fold
+    // Inner fold (3D effect)
     val fold = Path().apply {
-        moveTo(cx - s * 0.15f, cy - s * 0.4f)
-        lineTo(cx + s * 0.35f, cy + s * 0.1f)
-        lineTo(cx, cy + s * 0.45f)
-        lineTo(cx - s * 0.35f, cy)
+        moveTo(cx - s * 0.1f, cy - s * 0.35f)
+        lineTo(cx + s * 0.3f, cy + s * 0.1f)
+        lineTo(cx, cy + s * 0.4f)
+        lineTo(cx - s * 0.3f, cy)
         close()
     }
-    drawPath(fold, Color(0xFF1A0A00).copy(alpha = alpha * 0.5f))
+    drawPath(fold, Color(0xFF1A0A00).copy(alpha = alpha * 0.4f))
 }
