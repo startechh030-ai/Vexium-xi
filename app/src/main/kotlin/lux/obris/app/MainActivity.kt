@@ -1,6 +1,8 @@
 package lux.obris.app
 
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -15,11 +17,8 @@ import lux.obris.app.core.theme.ObrisTheme
 import lux.obris.app.feature.settings.presentation.SettingsViewModel
 import javax.inject.Inject
 
-/**
- * Main entry point for Obris.
- * Uses AppCompatActivity for biometric support.
- * Landscape only.
- */
+private const val TAG = "ObrisMain"
+
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
@@ -29,19 +28,29 @@ class MainActivity : AppCompatActivity() {
     lateinit var composeAuth: ComposeAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        try {
+            Log.d(TAG, "onCreate START")
+            installSplashScreen()
+            super.onCreate(savedInstanceState)
+            enableEdgeToEdge()
 
-        setContent {
-            val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+            Log.d(TAG, "Setting content...")
 
-            ObrisTheme(themeMode = themeMode) {
-                ObrisNavHost(
-                    settingsViewModel = settingsViewModel,
-                    composeAuth = composeAuth,
-                )
+            setContent {
+                val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+
+                ObrisTheme(themeMode = themeMode) {
+                    ObrisNavHost(
+                        settingsViewModel = settingsViewModel,
+                        composeAuth = composeAuth,
+                    )
+                }
             }
+
+            Log.d(TAG, "onCreate DONE")
+        } catch (e: Exception) {
+            Log.e(TAG, "CRASH in onCreate: ${e.message}", e)
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }
