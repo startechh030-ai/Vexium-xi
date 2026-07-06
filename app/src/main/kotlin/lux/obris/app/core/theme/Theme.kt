@@ -1,16 +1,11 @@
 package lux.obris.app.core.theme
 
-import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 
-// ── Obris dark color scheme — orange/cyan/purple on deep dark ──
+// ── Obris dark scheme — orange/cyan/purple on deep dark ──
 private val ObrisDarkScheme = darkColorScheme(
     primary = ObrisPrimary,
     onPrimary = ObrisOnPrimary,
@@ -48,32 +43,17 @@ private val ObrisDarkScheme = darkColorScheme(
     surfaceContainerHighest = ObrisSurfaceContainerHighest,
 )
 
-/** Theme mode enum — dark only for now */
+/** Theme mode enum */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-/** Obris app theme — vibrant orange/cyan on deep dark */
+/** Obris theme — dark only, full screen gaming */
 @Composable
 fun ObrisTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = ObrisDarkScheme
-    val view = LocalView.current
-
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = Color.Transparent.toArgb()
-            window.navigationBarColor = Color.Transparent.toArgb()
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
-            }
-        }
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = ObrisDarkScheme,
         typography = ObrisTypography,
         content = content,
     )
