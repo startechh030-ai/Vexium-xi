@@ -44,27 +44,19 @@ import kotlin.random.Random
 
 private const val TAG = "ObrisSplash"
 
-// ── Colors ──
+// ── Brand colors ──
 private val OrangeBright = Color(0xFFFF8C00)
 private val OrangeLight = Color(0xFFFFAA33)
 private val OrangeWarm = Color(0xFFFFF0E0)
-private val CyanAccent = Color(0xFF00E5FF)
+private val OrangeDim = Color(0xFF663300)
 
 /**
- * Obris splash screen — landscape, pure Canvas.
+ * Obris splash — landscape, pure Canvas.
  *
- * Visual: Half-sphere sits along the TOP edge of the screen.
- * A warm orange light sweeps left→right along the sphere arc.
- * Stars twinkle in the dark void below.
- * After the sweep, "OBRIS" letters assemble from scattered positions.
- *
- * Timeline:
- *  0.0-0.5s: Stars fade in
- *  0.5-1.5s: Half-sphere fades in at top
- *  1.5-3.5s: Warm light sweeps left→right along the arc
- *  3.5-5.0s: Letters of "OBRIS" fly together from edges
- *  5.0-6.0s: Hold
- *  6.0-6.8s: Fade out → navigate
+ * Half-sphere at BOTTOM edge (facing up like Vexium).
+ * Orange light sweeps left→right along the arc.
+ * Stars twinkle. "OBRIS" letters assemble.
+ * Total: ~5 seconds.
  */
 @Composable
 fun SplashScreen(
@@ -72,78 +64,72 @@ fun SplashScreen(
 ) {
     var phase by remember { mutableIntStateOf(0) }
 
-    // ── Animations ──
     val sphereAlpha = remember { Animatable(0f) }
     val sweepProgress = remember { Animatable(0f) }
     val screenFade = remember { Animatable(1f) }
     val loadingAlpha = remember { Animatable(0f) }
 
-    // Text assembly: 0 = scattered, 1 = assembled
+    // Text assembly
     var textTargetAssembly by remember { mutableFloatStateOf(0f) }
     val textAssembly by animateFloatAsState(
-        targetValue = textTargetAssembly,
-        animationSpec = tween(800),
-        label = "textAssembly",
+        textTargetAssembly, tween(700), label = "assemble",
     )
     var textTargetAlpha by remember { mutableFloatStateOf(0f) }
     val textAlpha by animateFloatAsState(
-        targetValue = textTargetAlpha,
-        animationSpec = tween(600),
-        label = "textAlpha",
+        textTargetAlpha, tween(500), label = "textAlpha",
     )
 
-    // Stars twinkle
-    val infiniteTransition = rememberInfiniteTransition(label = "stars")
-    val twinkle by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Reverse),
-        label = "twinkle",
+    // Stars
+    val inf = rememberInfiniteTransition(label = "s")
+    val twinkle by inf.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Reverse),
+        label = "tw",
     )
-
-    // Stars data — generated once
     val stars = remember {
-        List(50) { floatArrayOf(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 1.5f + 0.3f, Random.nextFloat(), Random.nextFloat()) }
+        List(55) {
+            floatArrayOf(
+                Random.nextFloat(), Random.nextFloat(),
+                Random.nextFloat() * 1.5f + 0.3f,
+                Random.nextFloat(), Random.nextFloat(),
+            )
+        }
     }
 
-    // ── Timeline ──
+    // ── Timeline: total ~5 seconds ──
     LaunchedEffect(Unit) {
         try {
-            Log.d(TAG, "Splash start")
-            delay(500)
+            delay(300)
 
-            // Phase 1: Sphere fades in
+            // Sphere fades in (0.3-1.0s)
             phase = 1
-            sphereAlpha.animateTo(1f, tween(1000))
+            sphereAlpha.animateTo(1f, tween(700))
 
-            // Phase 2: Light sweeps left → right
+            // Light sweeps (1.0-2.8s)
             phase = 2
-            sweepProgress.animateTo(1f, tween(2000, easing = LinearEasing))
-            delay(200)
+            sweepProgress.animateTo(1f, tween(1800, easing = LinearEasing))
 
-            // Phase 3: Text assembles
+            // Text assembles (2.8-3.8s)
             phase = 3
             textTargetAlpha = 1f
             textTargetAssembly = 1f
-            loadingAlpha.animateTo(0.5f, tween(400))
-            delay(1200)
+            loadingAlpha.animateTo(0.5f, tween(300))
+            delay(800)
 
-            // Phase 4: Hold
+            // Hold (3.8-4.3s)
             phase = 4
-            delay(600)
+            delay(500)
 
-            // Phase 5: Fade out
+            // Fade out (4.3-5.0s)
             phase = 5
-            screenFade.animateTo(0f, tween(800))
-
-            Log.d(TAG, "Splash done")
+            screenFade.animateTo(0f, tween(700))
             onSplashFinished()
         } catch (e: Exception) {
-            Log.e(TAG, "Splash error: ${e.message}", e)
+            Log.e(TAG, "Error: ${e.message}", e)
             onSplashFinished()
         }
     }
 
-    // ── UI ──
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -159,31 +145,29 @@ fun SplashScreen(
             if (w <= 0f || h <= 0f) return@Canvas
             val fo = screenFade.value
 
-            // ── Stars ──
+            // Stars
             drawStars(stars, twinkle, fo, w, h)
 
-            // ── Half-sphere at TOP edge ──
+            // Half-sphere at BOTTOM — facing up
             if (sphereAlpha.value > 0f) {
-                drawTopHalfSphere(w, h, sphereAlpha.value * fo)
+                drawBottomSphere(w, h, sphereAlpha.value * fo)
             }
 
-            // ── Warm light sweep along top arc ──
+            // Light sweep along bottom arc
             if (sweepProgress.value > 0f && phase >= 2) {
-                drawArcSweep(w, h, sweepProgress.value, fo)
+                drawBottomArcSweep(w, h, sweepProgress.value, fo)
             }
         }
 
-        // ── "OBRIS" text — letters assemble from scattered positions ──
+        // ── "OBRIS" letters assemble ──
         if (textAlpha > 0f) {
-            // Each letter scatters from a different direction then converges to center
-            val letters = "OBRIS"
-            val scatterOffsets = remember {
+            val scatterDirs = remember {
                 listOf(
-                    Pair(-180f, -60f),   // O from top-left
-                    Pair(-90f, 80f),     // B from bottom-left
-                    Pair(0f, -100f),     // R from top
-                    Pair(90f, 80f),      // I from bottom-right
-                    Pair(180f, -60f),    // S from top-right
+                    Pair(-160f, -50f),
+                    Pair(-80f, 60f),
+                    Pair(0f, -80f),
+                    Pair(80f, 60f),
+                    Pair(160f, -50f),
                 )
             }
 
@@ -191,18 +175,16 @@ fun SplashScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                letters.forEachIndexed { i, char ->
-                    // Scatter offset reduces as assembly approaches 1
+                "OBRIS".forEachIndexed { i, c ->
                     val scatter = 1f - textAssembly
-                    val ox = scatterOffsets[i].first * scatter
-                    val oy = scatterOffsets[i].second * scatter
-                    // Space letters horizontally: centered, each 36dp apart
-                    val letterSpacing = (i - 2) * 36
+                    val ox = scatterDirs[i].first * scatter
+                    val oy = scatterDirs[i].second * scatter
+                    val spacing = (i - 2) * 36
 
                     Text(
-                        text = char.toString(),
+                        text = c.toString(),
                         style = TextStyle(
-                            fontSize = 48.sp,
+                            fontSize = 46.sp,
                             fontWeight = FontWeight.Black,
                             color = if (i % 2 == 0) {
                                 OrangeBright.copy(alpha = textAlpha * screenFade.value)
@@ -211,15 +193,15 @@ fun SplashScreen(
                             },
                         ),
                         modifier = Modifier.offset(
-                            x = (letterSpacing + ox.toInt()).dp,
-                            y = oy.toInt().dp,
+                            x = (spacing + ox.toInt()).dp,
+                            y = (oy.toInt() - 20).dp, // Slightly above center
                         ),
                     )
                 }
             }
         }
 
-        // ── Loading text ──
+        // Loading
         if (loadingAlpha.value > 0f) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -228,58 +210,69 @@ fun SplashScreen(
                 Text(
                     text = "Loading...",
                     style = TextStyle(
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         color = OrangeBright.copy(alpha = loadingAlpha.value * screenFade.value),
                         letterSpacing = 3.sp,
                     ),
-                    modifier = Modifier.padding(bottom = 24.dp),
+                    modifier = Modifier.padding(bottom = 20.dp),
                 )
             }
         }
     }
 }
 
-// ═══════════════════════════════════════
-// DRAWING FUNCTIONS
-// ═══════════════════════════════════════
+// ══════════════════════════════════════
+// DRAWING
+// ══════════════════════════════════════
 
-/** Draw twinkling stars scattered across the screen */
 private fun DrawScope.drawStars(
-    stars: List<FloatArray>, twinkle: Float, alpha: Float,
-    w: Float, h: Float,
+    stars: List<FloatArray>, twinkle: Float, alpha: Float, w: Float, h: Float,
 ) {
     stars.forEach { s ->
         val t = ((twinkle + s[4]) % 1f)
-        val starAlpha = (s[3] * 0.3f + t * 0.5f * s[3]).coerceIn(0f, 0.6f) * alpha
-        if (starAlpha > 0.01f) {
-            drawCircle(
-                color = Color.White.copy(alpha = starAlpha),
-                radius = s[2].coerceAtLeast(0.5f),
-                center = Offset(s[0] * w, s[1] * h),
-            )
+        val a = (s[3] * 0.3f + t * 0.5f * s[3]).coerceIn(0f, 0.55f) * alpha
+        if (a > 0.01f) {
+            drawCircle(Color.White.copy(alpha = a), s[2].coerceAtLeast(0.5f), Offset(s[0] * w, s[1] * h))
         }
     }
 }
 
 /**
- * Draw a half-sphere sitting at the TOP edge.
- * The sphere center is ABOVE the screen — only the bottom arc is visible.
- * This creates a horizon effect at the top.
+ * Half-sphere at BOTTOM of screen — arc curves UPWARD.
+ * Sphere center is far below screen. Only the top arc peeks up.
+ * Like a planet rising from the bottom edge.
  */
-private fun DrawScope.drawTopHalfSphere(w: Float, h: Float, alpha: Float) {
-    // Sphere center is above the screen
-    val r = w * 0.8f
+private fun DrawScope.drawBottomSphere(w: Float, h: Float, alpha: Float) {
+    // Sphere is huge — center far below screen
+    // Only the top arc is visible, curving UPWARD
+    val r = w * 1.1f
     val cx = w / 2f
-    val cy = -r * 0.42f  // Center above screen — bottom arc visible at top
+    val cy = h + r * 0.60f // Far below — top arc barely peeks above bottom edge
 
-    // Sphere body — very dark, barely lighter than black
+    // Ambient glow — makes the orb feel alive and detached
+    drawCircle(
+        brush = Brush.radialGradient(
+            colorStops = arrayOf(
+                0.80f to Color.Transparent,
+                0.90f to OrangeDim.copy(alpha = 0.06f * alpha),
+                0.95f to OrangeBright.copy(alpha = 0.04f * alpha),
+                1f to OrangeBright.copy(alpha = 0.02f * alpha),
+            ),
+            center = Offset(cx, cy),
+            radius = (r * 1.15f).coerceAtLeast(10f),
+        ),
+        radius = (r * 1.15f).coerceAtLeast(10f),
+        center = Offset(cx, cy),
+    )
+
+    // Sphere body
     drawCircle(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
                 0f to Color(0xFF030306).copy(alpha = alpha),
-                0.90f to Color(0xFF020204).copy(alpha = alpha),
-                0.97f to Color(0xFF080810).copy(alpha = alpha),
-                1f to Color(0xFF0E0E18).copy(alpha = alpha),
+                0.88f to Color(0xFF020204).copy(alpha = alpha),
+                0.95f to Color(0xFF0A0A14).copy(alpha = alpha),
+                1f to Color(0xFF10101C).copy(alpha = alpha),
             ),
             center = Offset(cx, cy),
             radius = r.coerceAtLeast(1f),
@@ -288,62 +281,71 @@ private fun DrawScope.drawTopHalfSphere(w: Float, h: Float, alpha: Float) {
         center = Offset(cx, cy),
     )
 
-    // Edge glow rings
-    for (i in 1..4) {
-        val sw = (5 - i) * 3f
-        val a = (0.05f - i * 0.01f).coerceAtLeast(0.005f) * alpha
+    // Edge glow rings — orange tinted
+    for (i in 1..5) {
+        val sw = (6 - i) * 3.5f
+        val a = (0.07f - i * 0.012f).coerceAtLeast(0.004f) * alpha
         drawCircle(
-            color = OrangeBright.copy(alpha = a),
-            radius = r + sw,
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0.96f to OrangeBright.copy(alpha = a),
+                    1f to OrangeBright.copy(alpha = a * 0.2f),
+                ),
+                center = Offset(cx, cy),
+                radius = (r + sw + 5f).coerceAtLeast(10f),
+            ),
+            radius = r + sw / 2f,
             center = Offset(cx, cy),
             style = Stroke(width = sw),
         )
     }
 
-    // Sharp edge line with orange tint
+    // Sharp edge arc — brighter at the sides where arc meets screen edges
     drawCircle(
         brush = Brush.sweepGradient(
             colorStops = arrayOf(
-                0f to OrangeBright.copy(alpha = 0.12f * alpha),
-                0.15f to OrangeBright.copy(alpha = 0.05f * alpha),
-                0.35f to Color.Transparent,
+                0f to OrangeBright.copy(alpha = 0.18f * alpha),
+                0.1f to OrangeLight.copy(alpha = 0.10f * alpha),
+                0.25f to OrangeBright.copy(alpha = 0.04f * alpha),
+                0.4f to Color.Transparent,
                 0.5f to Color.Transparent,
-                0.65f to Color.Transparent,
-                0.85f to OrangeBright.copy(alpha = 0.05f * alpha),
-                1f to OrangeBright.copy(alpha = 0.12f * alpha),
+                0.6f to Color.Transparent,
+                0.75f to OrangeBright.copy(alpha = 0.04f * alpha),
+                0.9f to OrangeLight.copy(alpha = 0.10f * alpha),
+                1f to OrangeBright.copy(alpha = 0.18f * alpha),
             ),
             center = Offset(cx, cy),
         ),
         radius = r,
         center = Offset(cx, cy),
-        style = Stroke(width = 1.5f),
+        style = Stroke(width = 1.8f),
     )
 }
 
-/** Draw the warm orange light sweeping left→right along the top arc */
-private fun DrawScope.drawArcSweep(w: Float, h: Float, progress: Float, alpha: Float) {
-    val r = w * 0.8f
+/** Warm orange light sweeps left→right along the upward-facing arc */
+private fun DrawScope.drawBottomArcSweep(w: Float, h: Float, progress: Float, alpha: Float) {
+    val r = w * 1.1f
     val cx = w / 2f
-    val cy = -r * 0.42f
+    val cy = h + r * 0.60f
 
-    // Light travels along the bottom arc of the sphere (visible part)
-    // Angles: from ~150° (left) to ~30° (right) — bottom arc
-    val startAngle = 150f
-    val endAngle = 30f
-    val currentAngle = startAngle - (startAngle - endAngle) * progress
+    // Light travels along the TOP arc of the sphere (the visible crescent)
+    // Angles: 210° (left) → 330° (right) on the circle
+    val startAngle = 210f
+    val endAngle = 330f
+    val currentAngle = startAngle + (endAngle - startAngle) * progress
     val rad = currentAngle * PI.toFloat() / 180f
 
     val lx = cx + r * cos(rad)
     val ly = cy + r * sin(rad)
 
-    // Wide soft glow
-    val glowR = (r * 0.25f).coerceAtLeast(10f)
+    // Wide warm glow
+    val glowR = (r * 0.22f).coerceAtLeast(10f)
     drawCircle(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
-                0f to OrangeWarm.copy(alpha = 0.30f * alpha),
-                0.15f to OrangeLight.copy(alpha = 0.15f * alpha),
-                0.4f to OrangeBright.copy(alpha = 0.04f * alpha),
+                0f to OrangeWarm.copy(alpha = 0.28f * alpha),
+                0.12f to OrangeLight.copy(alpha = 0.14f * alpha),
+                0.35f to OrangeBright.copy(alpha = 0.04f * alpha),
                 1f to Color.Transparent,
             ),
             center = Offset(lx, ly),
@@ -354,13 +356,13 @@ private fun DrawScope.drawArcSweep(w: Float, h: Float, progress: Float, alpha: F
     )
 
     // Bright core
-    val coreR = (r * 0.08f).coerceAtLeast(5f)
+    val coreR = (r * 0.07f).coerceAtLeast(4f)
     drawCircle(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
-                0f to Color.White.copy(alpha = 0.50f * alpha),
-                0.15f to OrangeWarm.copy(alpha = 0.30f * alpha),
-                0.4f to OrangeWarm.copy(alpha = 0.06f * alpha),
+                0f to Color.White.copy(alpha = 0.55f * alpha),
+                0.12f to OrangeWarm.copy(alpha = 0.28f * alpha),
+                0.4f to OrangeWarm.copy(alpha = 0.05f * alpha),
                 1f to Color.Transparent,
             ),
             center = Offset(lx, ly),
@@ -370,13 +372,13 @@ private fun DrawScope.drawArcSweep(w: Float, h: Float, progress: Float, alpha: F
         center = Offset(lx, ly),
     )
 
-    // Trail behind the light
+    // Trail
     for (t in 1..8) {
         val tp = (progress - 0.08f * t / 8f).coerceAtLeast(0f)
-        val ta = startAngle - (startAngle - endAngle) * tp
+        val ta = startAngle + (endAngle - startAngle) * tp
         val tr = ta * PI.toFloat() / 180f
-        val trailAlpha = (1f - t / 8f) * 0.06f * alpha
-        val trailR = (r * 0.04f).coerceAtLeast(3f)
+        val trailAlpha = (1f - t / 8f) * 0.05f * alpha
+        val trailR = (r * 0.035f).coerceAtLeast(2f)
         if (trailAlpha > 0.001f) {
             drawCircle(
                 OrangeLight.copy(alpha = trailAlpha),
@@ -386,11 +388,11 @@ private fun DrawScope.drawArcSweep(w: Float, h: Float, progress: Float, alpha: F
         }
     }
 
-    // Illuminate the arc near the light
-    for (deg in -12..12) {
+    // Arc illumination near the light point
+    for (deg in -10..10) {
         val a = currentAngle + deg
         val ar = a * PI.toFloat() / 180f
-        val intensity = (1f - (abs(deg) / 12f)) * 0.10f * alpha
+        val intensity = (1f - (abs(deg) / 10f)) * 0.08f * alpha
         if (intensity > 0.001f) {
             drawCircle(
                 OrangeWarm.copy(alpha = intensity),
