@@ -24,6 +24,7 @@ import lux.obris.app.feature.auth.presentation.AuthViewModel
 import lux.obris.app.feature.auth.presentation.PostSplashDestination
 import lux.obris.app.feature.games.presentation.GamesScreen
 import lux.obris.app.feature.home.presentation.HomeScreen
+import lux.obris.app.feature.loading.presentation.LoadingScreen
 import lux.obris.app.feature.profile.presentation.ProfileScreen
 import lux.obris.app.feature.settings.presentation.GeneralSettingsScreen
 import lux.obris.app.feature.settings.presentation.SettingsViewModel
@@ -33,9 +34,11 @@ import lux.obris.app.feature.welcome.presentation.WelcomeScreen
 private const val TAG = "ObrisNav"
 
 /**
- * Obris navigation — simple flow:
- * Splash → Welcome (if not signed in) or Home (if signed in)
- * Google auth → straight to Home
+ * Obris navigation flow:
+ * Splash → Loading1 → Welcome → (auth) → LoadingFinal → Home
+ *
+ * If already signed in:
+ * Splash → Loading1 → LoadingFinal → Home (skip welcome)
  */
 @Composable
 fun ObrisNavHost(
@@ -50,13 +53,13 @@ fun ObrisNavHost(
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
 
-    // ── Auto-navigate when sign-in completes ──
+    // ── Auto-navigate when sign-in completes (from Welcome screen) ──
     LaunchedEffect(authState.isSignedIn) {
         if (authState.isSignedIn) {
             val onWelcome = currentRouteName?.contains(Screen.Welcome::class.qualifiedName ?: "") == true
             if (onWelcome) {
-                Log.d(TAG, "Signed in → Home")
-                navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } }
+                Log.d(TAG, "Signed in → Final Loading")
+                navController.navigate(Screen.LoadingFinal) { popUpTo(0) { inclusive = true } }
             }
         }
     }
@@ -64,10 +67,9 @@ fun ObrisNavHost(
     // ── Auto-navigate on sign-out ──
     LaunchedEffect(authState.isSignedIn, authState.postSplashDestination) {
         if (!authState.isSignedIn && authState.postSplashDestination == PostSplashDestination.WELCOME) {
-            val onHome = currentRouteName?.contains(Screen.Home::class.qualifiedName ?: "") == true ||
-                currentRouteName?.contains(Screen.Games::class.qualifiedName ?: "") == true ||
-                currentRouteName?.contains(Screen.Profile::class.qualifiedName ?: "") == true
-            if (onHome) {
+            val onMain = currentRouteName?.contains(Screen.Home::class.qualifiedName ?: "") == true ||
+                currentRouteName?.contains(Screen.Games::class.qualifiedName ?: "") == true
+            if (onMain) {
                 navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
             }
         }
@@ -105,15 +107,12 @@ fun ObrisNavHost(
         Scaffold(
             bottomBar = {
                 if (currentRouteScreen != null) {
-                    ObrisBottomBar(
-                        currentRoute = currentRouteScreen,
-                        onNavigate = { screen ->
-                            navController.navigate(screen) {
-                                popUpTo(Screen.Home) { saveState = true }
-                                launchSingleTop = true; restoreState = true
-                            }
-                        },
-                    )
+                    ObrisBottomBar(currentRoute = currentRouteScreen, onNavigate = { screen ->
+                        navController.navigate(screen) {
+                            popUpTo(Screen.Home) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    })
                 }
             },
         ) { innerPadding ->
@@ -122,20 +121,37 @@ fun ObrisNavHost(
                 startDestination = Screen.Splash,
                 modifier = Modifier.padding(innerPadding),
             ) {
-                // ── Splash ──
+                // ── 1. Splash (video) ──
                 composable<Screen.Splash> {
-                    val postDest = authState.postSplashDestination
                     SplashScreen(onSplashFinished = {
-                        val dest = authViewModel.onSplashCompleted()
-                        val target: Screen = when (postDest ?: dest) {
-                            PostSplashDestination.HOME -> Screen.Home
-                            PostSplashDestination.WELCOME -> Screen.Welcome
-                        }
-                        navController.navigate(target) { popUpTo(0) { inclusive = true } }
+                        navController.navigate(Screen.LoadingFirst) { popUpTo(0) { inclusive = true } }
                     })
                 }
 
-                // ── Welcome ──
+                // ── 2. First Loading Screen ──
+                composable<Screen.LoadingFirst> {
+                    LoadingScreen(
+                        statusMessages = listOf(
+                            "Initializing systems...",
+                            "Loading assets...",
+                            "Connecting to server...",
+                            "Checking version...",
+                            "Preparing environment...",
+                        ),
+                        durationMs = 3000L,
+                        onLoadingComplete = {
+                            // Check if already signed in → skip welcome
+                            val dest = authViewModel.onSplashCompleted()
+                            if (dest == PostSplashDestination.HOME) {
+                                navController.navigate(Screen.LoadingFinal) { popUpTo(0) { inclusive = true } }
+                            } else {
+                                navController.navigate(Screen.Welcome) { popUpTo(0) { inclusive = true } }
+                            }
+                        },
+                    )
+                }
+
+                // ── 3. Welcome / Auth ──
                 composable<Screen.Welcome> {
                     WelcomeScreen(
                         onGoogleClick = {
@@ -144,6 +160,22 @@ fun ObrisNavHost(
                         },
                         onEmailClick = { /* TODO */ },
                         onGuestClick = {
+                            navController.navigate(Screen.LoadingFinal) { popUpTo(0) { inclusive = true } }
+                        },
+                    )
+                }
+
+                // ── 4. Final Loading Screen ──
+                composable<Screen.LoadingFinal> {
+                    LoadingScreen(
+                        statusMessages = listOf(
+                            "Preparing the world...",
+                            "Loading game data...",
+                            "Syncing profile...",
+                            "Almost ready...",
+                        ),
+                        durationMs = 2500L,
+                        onLoadingComplete = {
                             navController.navigate(Screen.Home) { popUpTo(0) { inclusive = true } }
                         },
                     )
@@ -169,7 +201,7 @@ fun ObrisNavHost(
             }
         }
 
-        // ── Loading overlay ──
+        // ── Loading overlay during auth ──
         if (authState.isLoading) {
             FullScreenLoading(message = authState.loadingMessage)
         }
