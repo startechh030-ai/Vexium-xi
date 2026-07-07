@@ -2,6 +2,7 @@ package lux.obris.app
 
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,11 +21,8 @@ import lux.obris.app.core.theme.ObrisTheme
 import lux.obris.app.feature.settings.presentation.SettingsViewModel
 import javax.inject.Inject
 
-private const val TAG = "ObrisMain"
-
 /**
- * Main entry point — landscape, full screen edge-to-edge.
- * Hides status bar, nav bar — every pixel is game space.
+ * Main entry — landscape, full screen, every pixel used.
  */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -35,26 +33,23 @@ class MainActivity : AppCompatActivity() {
     lateinit var composeAuth: ComposeAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Full screen BEFORE super.onCreate — prevents any system UI flash
+        requestFullScreen()
+
         try {
             installSplashScreen()
             super.onCreate(savedInstanceState)
-
-            // ── Full screen: hide everything ──
             enableEdgeToEdge()
             hideSystemUI()
 
             setContent {
                 val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
-
                 ObrisTheme(themeMode = themeMode) {
-                    ObrisNavHost(
-                        settingsViewModel = settingsViewModel,
-                        composeAuth = composeAuth,
-                    )
+                    ObrisNavHost(settingsViewModel = settingsViewModel, composeAuth = composeAuth)
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "CRASH: ${e.message}", e)
+            Log.e("ObrisMain", "CRASH: ${e.message}", e)
         }
     }
 
@@ -63,15 +58,23 @@ class MainActivity : AppCompatActivity() {
         if (hasFocus) hideSystemUI()
     }
 
-    /** Hide status bar, navigation bar — true full screen */
+    /** Request full screen via window flags — works before setContent */
+    @Suppress("DEPRECATION")
+    private fun requestFullScreen() {
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+        )
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+    }
+
+    /** Hide system bars using modern API */
     private fun hideSystemUI() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-        // Keep screen on during splash
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 }

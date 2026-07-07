@@ -1,6 +1,7 @@
 package lux.obris.app.feature.welcome.presentation
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -31,8 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.rememberAsyncImagePainter
@@ -40,9 +39,10 @@ import coil3.request.ImageRequest
 import lux.obris.app.R
 
 /**
- * Welcome screen — vest_screen.png background, full screen.
- * Auth buttons on the right side (landscape).
- * No UI polish yet — placeholder layout.
+ * Welcome / Auth screen — Free Fire style.
+ * Full bleed background image.
+ * Auth buttons centered at bottom.
+ * Version number top-left. Offline play bottom-right (future).
  */
 @Composable
 fun WelcomeScreen(
@@ -50,7 +50,6 @@ fun WelcomeScreen(
     onEmailClick: () -> Unit = {},
     onGuestClick: () -> Unit = {},
 ) {
-    // Background image from assets
     val bgPainter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(LocalContext.current)
             .data("file:///android_asset/vest_screen.png")
@@ -58,123 +57,149 @@ fun WelcomeScreen(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── Background — stretch to fill ──
+        // ── Background — fills entire screen edge to edge ──
         Image(
             painter = bgPainter,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.FillBounds,
         )
 
-        // ── Auth buttons — right side for landscape ──
-        Row(
+        // ── Version badge — top left ──
+        Text(
+            text = "v1.0.0",
+            style = TextStyle(
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.4f),
+                letterSpacing = 1.sp,
+            ),
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp),
+        )
+
+        // ── Auth section — centered at bottom ──
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(bottom = 36.dp),
+            verticalArrangement = Arrangement.Bottom,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Left spacer — logo area is in the background image
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Right — auth buttons
-            Column(
+            // Google button — prominent, like Free Fire's Facebook button
+            Row(
                 modifier = Modifier
-                    .weight(0.8f)
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.White)
+                    .clickable(
+                        remember { MutableInteractionSource() },
+                        ripple(bounded = true),
+                        onClick = onGoogleClick,
+                    )
+                    .padding(horizontal = 32.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
             ) {
-                // Google
-                WelcomeButton(
-                    iconRes = R.drawable.ic_google,
-                    text = "Continue with Google",
-                    onClick = onGoogleClick,
+                Icon(
+                    painterResource(R.drawable.ic_google),
+                    null,
+                    Modifier.size(18.dp),
+                    tint = Color.Unspecified,
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Email
-                WelcomeButton(
-                    iconRes = R.drawable.ic_email,
-                    text = "Continue with Email",
-                    onClick = onEmailClick,
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Guest
+                Spacer(Modifier.width(10.dp))
                 Text(
-                    text = "Play as Guest",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.7f),
+                    "Sign in with Google",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF333333),
+                    ),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── or ──
+            Row(
+                modifier = Modifier.fillMaxWidth(0.35f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f).height(0.5.dp).background(Color.White.copy(alpha = 0.2f)))
+                Text(
+                    "or",
+                    Modifier.padding(horizontal = 12.dp),
+                    style = TextStyle(fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f)),
+                )
+                Box(Modifier.weight(1f).height(0.5.dp).background(Color.White.copy(alpha = 0.2f)))
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Guest + More row — like Free Fire
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Guest button
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White.copy(alpha = 0.9f))
                         .clickable(
                             remember { MutableInteractionSource() },
                             ripple(bounded = true),
                             onClick = onGuestClick,
                         )
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                )
+                        .padding(horizontal = 24.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "👤",
+                        fontSize = 14.sp,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Guest",
+                        style = TextStyle(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF333333),
+                        ),
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Legal
-                Text(
-                    text = "By continuing, you agree to our Terms & Privacy Policy",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.2f),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 14.sp,
-                )
+                // More button (email etc — future)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White.copy(alpha = 0.9f))
+                        .clickable(
+                            remember { MutableInteractionSource() },
+                            ripple(bounded = true),
+                            onClick = onEmailClick,
+                        )
+                        .padding(horizontal = 24.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "••• More",
+                        style = TextStyle(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF333333),
+                        ),
+                    )
+                }
             }
-        }
-    }
-}
 
-/** Auth button — semi-transparent with border */
-@Composable
-private fun WelcomeButton(
-    iconRes: Int,
-    text: String,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(14.dp)
+            Spacer(modifier = Modifier.height(12.dp))
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth(0.85f)
-            .height(48.dp)
-            .clip(shape)
-            .border(
-                0.8.dp,
-                Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.05f)),
+            // Legal
+            Text(
+                "I have read and agree to the Terms of Service and Privacy Policy.",
+                style = TextStyle(
+                    fontSize = 9.sp,
+                    color = Color.White.copy(alpha = 0.3f),
                 ),
-                shape,
             )
-            .clickable(
-                remember { MutableInteractionSource() },
-                ripple(bounded = true),
-                onClick = onClick,
-            )
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            painterResource(iconRes),
-            null,
-            Modifier.size(18.dp),
-            tint = Color.Unspecified,
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = Color.White.copy(alpha = 0.85f),
-        )
+        }
     }
 }

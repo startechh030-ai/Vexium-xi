@@ -5,10 +5,10 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -39,137 +38,105 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.delay
 
 /**
- * Loading screen — shows vest_screen.png background with a progress bar.
- * Simulates loading tasks (placeholder for real loading later).
- *
- * @param statusMessages List of loading status messages to cycle through.
- * @param durationMs Total loading time in milliseconds.
- * @param onLoadingComplete Called when loading finishes.
+ * Loading screen — Free Fire style.
+ * Background image fills entire screen edge-to-edge.
+ * Thin progress bar + status text at bottom.
  */
 @Composable
 fun LoadingScreen(
     statusMessages: List<String> = listOf(
-        "Initializing...",
-        "Loading assets...",
+        "Loading...",
         "Connecting to server...",
         "Preparing the world...",
-        "Almost ready...",
     ),
     durationMs: Long = 3000L,
     onLoadingComplete: () -> Unit,
 ) {
-    // ── Progress animation ──
     val progress = remember { Animatable(0f) }
-    var messageIndex by remember { mutableIntStateOf(0) }
     var currentMessage by remember { mutableStateOf(statusMessages.first()) }
 
-    // ── Background image ──
+    // Background
     val bgPainter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(LocalContext.current)
             .data("file:///android_asset/vest_screen.png")
             .build(),
     )
 
-    // ── Animate progress and cycle messages ──
+    // Animate
     LaunchedEffect(Unit) {
-        // Animate progress bar
-        progress.animateTo(1f, tween(durationMs.toInt(), easing = LinearEasing))
-        delay(200)
-        onLoadingComplete()
-    }
-
-    // Cycle status messages
-    LaunchedEffect(Unit) {
+        // Cycle messages
         val interval = durationMs / statusMessages.size
-        for (i in statusMessages.indices) {
-            currentMessage = statusMessages[i]
-            messageIndex = i
+        for (msg in statusMessages) {
+            currentMessage = msg
             delay(interval)
         }
     }
 
-    // ── UI ──
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(durationMs.toInt(), easing = LinearEasing))
+        delay(150)
+        onLoadingComplete()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background image — stretch to fill
+        // ── Background — edge to edge, no padding, FillBounds ──
         Image(
             painter = bgPainter,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.FillBounds,
         )
 
-        // Bottom overlay — loading bar + text
+        // ── Bottom bar: progress + text ──
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp, vertical = 32.dp),
+                .padding(bottom = 28.dp, start = 40.dp, end = 40.dp),
             verticalArrangement = Arrangement.Bottom,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // "Loading..." text
+            // Status text
             Text(
-                text = "Loading...",
+                text = currentMessage.uppercase(),
                 style = TextStyle(
-                    fontSize = 14.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.9f),
+                    color = Color.White.copy(alpha = 0.8f),
                     letterSpacing = 2.sp,
                 ),
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Progress bar + percentage
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.5f)
-                    .height(4.dp),
-            ) {
+            // Progress bar — thin white line like Free Fire
+            Box(modifier = Modifier.fillMaxWidth(0.45f).height(3.dp)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val w = size.width
-                    val h = size.height
-
                     // Track
                     drawRoundRect(
-                        color = Color.White.copy(alpha = 0.15f),
-                        size = Size(w, h),
-                        cornerRadius = CornerRadius(h / 2f),
+                        color = Color.White.copy(alpha = 0.12f),
+                        size = Size(size.width, size.height),
+                        cornerRadius = CornerRadius(size.height / 2f),
                     )
-
                     // Fill
-                    val fillWidth = w * progress.value
-                    if (fillWidth > 0f) {
+                    val fw = size.width * progress.value
+                    if (fw > 0f) {
                         drawRoundRect(
-                            color = Color.White,
-                            size = Size(fillWidth, h),
-                            cornerRadius = CornerRadius(h / 2f),
+                            color = Color.White.copy(alpha = 0.9f),
+                            size = Size(fw, size.height),
+                            cornerRadius = CornerRadius(size.height / 2f),
                         )
                     }
                 }
-
-                // Percentage text
-                Text(
-                    text = "${(progress.value * 100).toInt()}%",
-                    style = TextStyle(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.7f),
-                    ),
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(start = 8.dp),
-                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Status message
+            // Percentage
             Text(
-                text = currentMessage,
+                text = "${(progress.value * 100).toInt()}%",
                 style = TextStyle(
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = Color.White.copy(alpha = 0.5f),
-                    letterSpacing = 1.sp,
                 ),
             )
         }
