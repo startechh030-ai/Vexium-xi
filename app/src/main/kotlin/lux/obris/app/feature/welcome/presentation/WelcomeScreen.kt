@@ -65,6 +65,19 @@ fun WelcomeScreen(
             contentScale = ContentScale.FillBounds,
         )
 
+        // ── Bottom gradient for button readability ──
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.75f)),
+                        startY = 0f,
+                        endY = Float.MAX_VALUE,
+                    ),
+                ),
+        )
+
         // ── Version badge — top left ──
         Text(
             text = "v1.0.0",

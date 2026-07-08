@@ -1,5 +1,7 @@
 package lux.obris.app
 
+import android.content.pm.ActivityInfo
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -21,26 +23,21 @@ import lux.obris.app.core.theme.ObrisTheme
 import lux.obris.app.feature.settings.presentation.SettingsViewModel
 import javax.inject.Inject
 
-/**
- * Main entry — landscape, full screen, every pixel used.
- */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModels()
 
-    @Inject
-    lateinit var composeAuth: ComposeAuth
+    @Inject lateinit var composeAuth: ComposeAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Full screen BEFORE super.onCreate — prevents any system UI flash
-        requestFullScreen()
-
+        goFullScreen()
         try {
             installSplashScreen()
             super.onCreate(savedInstanceState)
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             enableEdgeToEdge()
-            hideSystemUI()
+            immersive()
 
             setContent {
                 val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -49,32 +46,37 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("ObrisMain", "CRASH: ${e.message}", e)
+            Log.e("Obris", "CRASH: ${e.message}", e)
         }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemUI()
+        if (hasFocus) immersive()
     }
 
-    /** Request full screen via window flags — works before setContent */
     @Suppress("DEPRECATION")
-    private fun requestFullScreen() {
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-        )
+    private fun goFullScreen() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
     }
 
-    /** Hide system bars using modern API */
-    private fun hideSystemUI() {
+    @Suppress("DEPRECATION")
+    private fun immersive() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        WindowInsetsControllerCompat(window, window.decorView).let {
+            it.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+            it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+        // Fallback for older Android
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        }
     }
 }

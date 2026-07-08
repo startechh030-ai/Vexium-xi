@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,13 +80,25 @@ fun LoadingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── Background — edge to edge, no padding, FillBounds ──
+        // ── Background — true edge to edge ──
         Image(
             painter = bgPainter,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.FillBounds,
         )
+
+        // ── Bottom gradient overlay for readability ──
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                    startY = size.height * 0.5f,
+                    endY = size.height,
+                ),
+                size = Size(size.width, size.height),
+            )
+        }
 
         // ── Bottom bar: progress + text ──
         Column(
