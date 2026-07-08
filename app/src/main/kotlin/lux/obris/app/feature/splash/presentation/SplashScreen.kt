@@ -190,8 +190,8 @@ private fun DrawScope.drawShatteredO(cx: Float, cy: Float, outerR: Float, alpha:
         val co = Offset((rng.nextFloat() - 0.5f) * off * 2f, (rng.nextFloat() - 0.5f) * off)
 
         listOf(topPiece, bottomPiece).forEach { p ->
-            val pr = Path(p); pr.translate(ro)
-            val pc = Path(p); pc.translate(co)
+            val pr = Path().apply { addPath(p); translate(ro) }
+            val pc = Path().apply { addPath(p); translate(co) }
             drawPath(pr, Color.Red.copy(alpha = alpha * glitch * 0.5f), style = Fill)
             drawPath(pc, Color.Cyan.copy(alpha = alpha * glitch * 0.4f), style = Fill)
         }
