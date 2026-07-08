@@ -4,6 +4,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +34,7 @@ import lux.obris.app.feature.welcome.presentation.WelcomeScreen
 
 private const val TAG = "ObrisNav"
 
+@Suppress("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun ObrisNavHost(
     settingsViewModel: SettingsViewModel,
@@ -46,7 +48,6 @@ fun ObrisNavHost(
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
 
-    // Auto-navigate on sign-in
     LaunchedEffect(authState.isSignedIn) {
         if (authState.isSignedIn) {
             val onWelcome = currentRouteName?.contains(Screen.Welcome::class.qualifiedName ?: "") == true
@@ -56,7 +57,6 @@ fun ObrisNavHost(
         }
     }
 
-    // Auto-navigate on sign-out
     LaunchedEffect(authState.isSignedIn, authState.postSplashDestination) {
         if (!authState.isSignedIn && authState.postSplashDestination == PostSplashDestination.WELCOME) {
             val onMain = currentRouteName?.contains(Screen.Home::class.qualifiedName ?: "") == true ||
@@ -67,7 +67,6 @@ fun ObrisNavHost(
         }
     }
 
-    // Errors
     LaunchedEffect(authState.error) {
         authState.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -75,7 +74,6 @@ fun ObrisNavHost(
         }
     }
 
-    // Google Sign-In
     val googleSignInState = composeAuth.rememberSignInWithGoogle(
         onResult = { result ->
             when (result) {
@@ -87,29 +85,18 @@ fun ObrisNavHost(
         },
     )
 
-    // Bottom bar visibility
-    val currentRouteScreen: Screen? = when {
-        currentRouteName?.contains(Screen.Home::class.qualifiedName ?: "") == true -> Screen.Home
-        currentRouteName?.contains(Screen.Games::class.qualifiedName ?: "") == true -> Screen.Games
-        currentRouteName?.contains(Screen.Profile::class.qualifiedName ?: "") == true -> Screen.Profile
-        else -> null
-    }
-
-    // ── NO Scaffold padding for splash/loading/welcome — truly full screen ──
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = Screen.Splash,
             modifier = Modifier.fillMaxSize(),
         ) {
-            // Splash
             composable<Screen.Splash> {
                 SplashScreen(onSplashFinished = {
                     navController.navigate(Screen.LoadingFirst) { popUpTo(0) { inclusive = true } }
                 })
             }
 
-            // First loading
             composable<Screen.LoadingFirst> {
                 LoadingScreen(
                     statusMessages = listOf("Initializing...", "Loading assets...", "Connecting to server...", "Preparing environment..."),
@@ -125,21 +112,14 @@ fun ObrisNavHost(
                 )
             }
 
-            // Welcome
             composable<Screen.Welcome> {
                 WelcomeScreen(
-                    onGoogleClick = {
-                        authViewModel.onGoogleSignInStarted()
-                        googleSignInState.startFlow()
-                    },
+                    onGoogleClick = { authViewModel.onGoogleSignInStarted(); googleSignInState.startFlow() },
                     onEmailClick = { },
-                    onGuestClick = {
-                        navController.navigate(Screen.LoadingFinal) { popUpTo(0) { inclusive = true } }
-                    },
+                    onGuestClick = { navController.navigate(Screen.LoadingFinal) { popUpTo(0) { inclusive = true } } },
                 )
             }
 
-            // Final loading
             composable<Screen.LoadingFinal> {
                 LoadingScreen(
                     statusMessages = listOf("Preparing the world...", "Loading game data...", "Almost ready..."),
@@ -150,7 +130,6 @@ fun ObrisNavHost(
                 )
             }
 
-            // ── Main tabs (these use bottom bar via Scaffold) ──
             composable<Screen.Home> {
                 Scaffold(
                     bottomBar = {
@@ -158,11 +137,13 @@ fun ObrisNavHost(
                             navController.navigate(screen) { popUpTo(Screen.Home) { saveState = true }; launchSingleTop = true; restoreState = true }
                         })
                     },
-                ) { _ ->
-                    HomeScreen(
-                        onNavigateToGames = { navController.navigate(Screen.Games) },
-                        onLogout = { authViewModel.signOut() },
-                    )
+                ) { padding ->
+                    Box(Modifier.fillMaxSize().padding(padding)) {
+                        HomeScreen(
+                            onNavigateToGames = { navController.navigate(Screen.Games) },
+                            onLogout = { authViewModel.signOut() },
+                        )
+                    }
                 }
             }
 
@@ -173,8 +154,10 @@ fun ObrisNavHost(
                             navController.navigate(screen) { popUpTo(Screen.Home) { saveState = true }; launchSingleTop = true; restoreState = true }
                         })
                     },
-                ) { _ ->
-                    GamesScreen(onNavigateToGameDetail = { navController.navigate(Screen.GameDetail(it)) })
+                ) { padding ->
+                    Box(Modifier.fillMaxSize().padding(padding)) {
+                        GamesScreen(onNavigateToGameDetail = { navController.navigate(Screen.GameDetail(it)) })
+                    }
                 }
             }
 
@@ -185,8 +168,10 @@ fun ObrisNavHost(
                             navController.navigate(screen) { popUpTo(Screen.Home) { saveState = true }; launchSingleTop = true; restoreState = true }
                         })
                     },
-                ) { _ ->
-                    ProfileScreen()
+                ) { padding ->
+                    Box(Modifier.fillMaxSize().padding(padding)) {
+                        ProfileScreen()
+                    }
                 }
             }
 
@@ -195,7 +180,6 @@ fun ObrisNavHost(
             }
         }
 
-        // Loading overlay
         if (authState.isLoading) {
             FullScreenLoading(message = authState.loadingMessage)
         }
