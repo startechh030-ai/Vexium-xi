@@ -1,273 +1,181 @@
 package lux.obris.app.feature.splash.presentation
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
+import android.graphics.BitmapFactory
+import android.media.MediaPlayer
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateInt
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlin.math.max
-import kotlin.math.sqrt
+import java.io.IOException
 import kotlin.random.Random
 
 /**
- * Splash — shattered "O" mark with glitch effects.
- * ~2.5s punchy stinger then fade out.
+ * Splash screen — loads obris.png from assets/splash/,
+ * plays glitch.mp3 sound, applies cyberpunk glitch animation.
+ * Pure black background. 2.5 seconds total.
+ *
+ * Flow: Tap app → black → logo appears with glitch → done
  */
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
-    val logoAlpha = remember { Animatable(0f) }
-    val glitchIntensity = remember { Animatable(0f) }
-    val fadeOut = remember { Animatable(1f) }
-    val glitchSeed = remember { Animatable(0f) }
-    val flicker = remember { Animatable(1f) }
-    val scale = remember { Animatable(0.92f) }
+    val context = LocalContext.current
+    var logoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
+    // Load assets + play sound
     LaunchedEffect(Unit) {
-        delay(150)
-        logoAlpha.animateTo(1f, tween(300))
-        scale.animateTo(1f, tween(300, easing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)))
-        delay(180)
-
-        // Glitch burst 1
-        glitchIntensity.animateTo(0.55f, tween(60))
-        glitchSeed.animateTo(1f, tween(60))
-        glitchIntensity.animateTo(0f, tween(70))
-        delay(110)
-
-        // Glitch burst 2
-        glitchIntensity.animateTo(0.8f, tween(50))
-        glitchSeed.animateTo(2f, tween(50))
-        glitchIntensity.animateTo(0.15f, tween(40))
-        glitchSeed.animateTo(3f, tween(40))
-        glitchIntensity.animateTo(0.9f, tween(45))
-        glitchIntensity.animateTo(0f, tween(90))
-        delay(130)
-
-        // Glitch burst 3 — heavy
-        flicker.animateTo(0.12f, tween(20))
-        glitchIntensity.animateTo(1f, tween(35))
-        glitchSeed.animateTo(4f, tween(35))
-        flicker.animateTo(1f, tween(30))
-        delay(45)
-        glitchIntensity.animateTo(0.25f, tween(25))
-        glitchSeed.animateTo(5f, tween(25))
-        flicker.animateTo(0.3f, tween(25))
-        glitchIntensity.animateTo(1f, tween(35))
-        glitchSeed.animateTo(6f, tween(35))
-        flicker.animateTo(1f, tween(40))
-        glitchIntensity.animateTo(0.4f, tween(30))
-        glitchSeed.animateTo(7f, tween(30))
-        glitchIntensity.animateTo(0f, tween(110))
-
-        // Settle flicker
-        repeat(3) { i ->
-            flicker.animateTo(0.45f, tween(22))
-            flicker.animateTo(1f, tween(35 + i * 20))
+        // Load logo from assets/splash/obris.png
+        try {
+            context.assets.open("splash/obris.png").use { stream ->
+                logoBitmap = BitmapFactory.decodeStream(stream)?.asImageBitmap()
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
         }
 
-        // Snap
-        scale.animateTo(1.1f, tween(90, easing = CubicBezierEasing(0.3f, 0f, 0.2f, 1f)))
-        scale.animateTo(1f, tween(140, easing = CubicBezierEasing(0.2f, 0.9f, 0.3f, 1f)))
+        // Play glitch sound from res/raw/glitch.mp3
+        try {
+            mediaPlayer = MediaPlayer.create(context, lux.obris.app.R.raw.glitch)?.apply {
+                setOnCompletionListener { it.release() }
+                start()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
-        delay(450)
-        fadeOut.animateTo(0f, tween(400))
+        // Total splash duration: 2.5 seconds
+        delay(2500)
+
+        // Cleanup and navigate
+        mediaPlayer?.let {
+            try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {}
+        }
         onSplashFinished()
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width; val h = size.height
-            if (w <= 0f || h <= 0f) return@Canvas
-            val cx = w / 2f; val cy = h / 2f
-            val alpha = logoAlpha.value * fadeOut.value * flicker.value
-            val glitch = glitchIntensity.value
-            val seed = glitchSeed.value
+    // Release on dispose (safety)
+    DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer?.let {
+                try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {}
+            }
+        }
+    }
 
-            drawVignette(cx, cy, w, h)
-            drawScanlines(w, h, alpha = 0.05f + glitch * 0.05f)
-            if (alpha <= 0f) return@Canvas
-
-            val outerR = minOf(w, h) * 0.34f * scale.value
-            drawShatteredO(cx, cy, outerR, alpha, glitch, seed)
-            drawBrandLabel(cx, cy, outerR, alpha, glitch, seed)
-            if (glitch > 0.15f) drawDigitalNoise(w, h, glitch, seed)
+    // UI
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF000000)), // Pure black
+        contentAlignment = Alignment.Center,
+    ) {
+        logoBitmap?.let { bitmap ->
+            Image(
+                bitmap = bitmap,
+                contentDescription = "Obris Logo",
+                modifier = Modifier
+                    .size(240.dp)
+                    .cyberpunkGlitch(enabled = true),
+            )
         }
     }
 }
 
-// ── Cut geometry for the fracture line ──
-private data class CutGeometry(val p0: Offset, val p1: Offset, val p2: Offset, val p3: Offset, val p4: Offset, val p5: Offset)
+/**
+ * Cyberpunk glitch modifier — slices the image horizontally,
+ * shifts slices randomly, overlays chromatic color artifacts.
+ */
+@Composable
+fun Modifier.cyberpunkGlitch(
+    enabled: Boolean = true,
+    slices: Int = 16,
+    glitchColors: List<Color> = listOf(Color(0xFF00FFFF), Color(0xFFFF0055), Color(0xFFFFFFFF)),
+): Modifier {
+    if (!enabled) return this
 
-private fun computeCutGeometry(cx: Float, cy: Float, outerR: Float, jitter: Float, seed: Int): CutGeometry {
-    val rng = Random(seed)
-    fun j() = (rng.nextFloat() - 0.5f) * jitter
-    fun pt(fx: Float, fy: Float) = Offset(cx + fx * outerR + j(), cy + fy * outerR + j())
-    return CutGeometry(pt(0.95f, -1.45f), pt(0.60f, -0.85f), pt(0.30f, -0.25f), pt(0.02f, 0.05f), pt(-0.30f, 0.30f), pt(-0.95f, 1.05f))
-}
+    val infiniteTransition = rememberInfiniteTransition(label = "Glitch")
 
-private fun buildAnnulus(cx: Float, cy: Float, outerR: Float, innerR: Float): Path {
-    val outer = Path().apply { addOval(Rect(cx - outerR, cy - outerR, cx + outerR, cy + outerR)) }
-    val inner = Path().apply { addOval(Rect(cx - innerR, cy - innerR, cx + innerR, cy + innerR)) }
-    return Path().apply { op(outer, inner, PathOperation.Difference) }
-}
-
-private fun buildDividerRegions(cx: Float, cy: Float, outerR: Float, geo: CutGeometry): Pair<Path, Path> {
-    val m = outerR * 25f
-    val top = Path().apply {
-        moveTo(cx - m, cy - m); lineTo(cx + m, cy - m)
-        lineTo(geo.p0.x, geo.p0.y); lineTo(geo.p1.x, geo.p1.y); lineTo(geo.p2.x, geo.p2.y)
-        lineTo(geo.p3.x, geo.p3.y); lineTo(geo.p4.x, geo.p4.y); lineTo(geo.p5.x, geo.p5.y)
-        lineTo(cx - m, cy + m); close()
-    }
-    val box = Path().apply { addRect(Rect(cx - m, cy - m, cx + m, cy + m)) }
-    val bottom = Path().apply { op(box, top, PathOperation.Difference) }
-    return top to bottom
-}
-
-private fun buildShard(geo: CutGeometry, width: Float): Path {
-    val dx = geo.p0.x - geo.p1.x; val dy = geo.p0.y - geo.p1.y
-    val len = max(sqrt(dx * dx + dy * dy), 0.001f)
-    val nx = -dy / len; val ny = dx / len
-    return Path().apply {
-        moveTo(geo.p1.x + nx * width, geo.p1.y + ny * width)
-        lineTo(geo.p0.x, geo.p0.y)
-        lineTo(geo.p1.x - nx * width, geo.p1.y - ny * width)
-        close()
-    }
-}
-
-private fun DrawScope.drawShatteredO(cx: Float, cy: Float, outerR: Float, alpha: Float, glitch: Float, seed: Float) {
-    val innerR = outerR * 0.58f
-    val strokeGlow = outerR * 0.03f
-    val neon = Color(0xFFFF8C00)
-
-    val restingGap = outerR * 0.045f
-    val gap = restingGap + outerR * 0.16f * glitch
-    val jitterAmt = outerR * 0.05f * glitch
-
-    val geo = computeCutGeometry(cx, cy, outerR, jitterAmt, seed.toInt() * 97 + 13)
-    val annulus = buildAnnulus(cx, cy, outerR, innerR)
-    val (topRegion, bottomRegion) = buildDividerRegions(cx, cy, outerR, geo)
-    val shard = buildShard(geo, outerR * 0.045f)
-
-    val topBase = Path().apply { op(annulus, topRegion, PathOperation.Intersect) }
-    val topPiece = Path().apply { op(topBase, shard, PathOperation.Union) }
-    val bottomPiece = Path().apply { op(annulus, bottomRegion, PathOperation.Intersect) }
-
-    topPiece.translate(Offset(-gap * 0.65f, -gap * 0.65f))
-    bottomPiece.translate(Offset(gap * 0.7f, gap * 0.5f))
-
-    // Glow
-    val glow = outerR * 2.6f
-    drawCircle(
-        brush = Brush.radialGradient(listOf(neon.copy(alpha = alpha * (0.12f + glitch * 0.14f)), Color.Transparent), Offset(cx, cy), glow.coerceAtLeast(10f)),
-        radius = glow.coerceAtLeast(10f), center = Offset(cx, cy),
+    // Tick that drives the glitch timing
+    val glitchStep by infiniteTransition.animateInt(
+        initialValue = 0,
+        targetValue = 10,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "GlitchStep",
     )
 
-    // RGB ghosts
-    if (glitch > 0.08f) {
-        val rng = Random(seed.toInt() * 31 + 5)
-        val off = glitch * outerR * 0.06f
-        val ro = Offset((rng.nextFloat() - 0.5f) * off * 2f, (rng.nextFloat() - 0.5f) * off)
-        val co = Offset((rng.nextFloat() - 0.5f) * off * 2f, (rng.nextFloat() - 0.5f) * off)
+    return this
+        .graphicsLayer { clip = true }
+        .drawWithContent {
+            // Only glitch during certain frames (2-6 out of 0-10)
+            val isGlitchActive = glitchStep in 2..6
+            val intensity = if (isGlitchActive) (glitchStep / 10f) else 0f
 
-        listOf(topPiece, bottomPiece).forEach { p ->
-            val pr = Path().apply { addPath(p); translate(ro) }
-            val pc = Path().apply { addPath(p); translate(co) }
-            drawPath(pr, Color.Red.copy(alpha = alpha * glitch * 0.5f), style = Fill)
-            drawPath(pc, Color.Cyan.copy(alpha = alpha * glitch * 0.4f), style = Fill)
+            if (!isGlitchActive) {
+                // Clean frame — just draw normally
+                drawContent()
+            } else {
+                // Glitch frame — slice and shift
+                val sliceHeight = size.height / slices
+
+                for (i in 0 until slices) {
+                    // Random horizontal shift per slice
+                    val horizontalShift = if (Random.nextInt(4) < glitchStep) {
+                        Random.nextInt(-45, 46).toFloat() * intensity
+                    } else 0f
+
+                    // Random chance of color overlay
+                    val applyColor = Random.nextInt(100) < 20
+
+                    clipRect(
+                        top = i * sliceHeight,
+                        bottom = (i + 1) * sliceHeight,
+                    ) {
+                        translate(left = horizontalShift) {
+                            drawContent()
+
+                            if (applyColor) {
+                                drawRect(
+                                    color = glitchColors[Random.nextInt(glitchColors.size)],
+                                    topLeft = Offset(0f, i * sliceHeight),
+                                    size = Size(size.width, sliceHeight),
+                                    blendMode = BlendMode.SrcAtop,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
-
-        val sliceCount = (glitch * 6).toInt().coerceAtLeast(1)
-        repeat(sliceCount) {
-            val sliceY = cy - outerR * 1.3f + outerR * 2.6f * rng.nextFloat()
-            val sliceH = outerR * 0.09f * rng.nextFloat() + 1.5f
-            val sliceDx = (rng.nextFloat() - 0.5f) * outerR * 0.5f * glitch
-            val tearColor = listOf(Color.White, Color.Cyan, Color.Red, neon)[rng.nextInt(4)]
-            drawRect(tearColor.copy(alpha = alpha * 0.45f * glitch), Offset(cx - outerR - strokeGlow + sliceDx, sliceY), Size(outerR * 2f + strokeGlow * 2f, sliceH))
-        }
-    }
-
-    // Chrome fill
-    val chrome = Brush.linearGradient(
-        listOf(Color(0xFFF3F3F5), Color(0xFFC9C9D1), Color(0xFF9C9CA6), Color(0xFFFFFFFF), Color(0xFFA6A6AF)),
-        Offset(cx - outerR, cy - outerR), Offset(cx + outerR, cy + outerR),
-    )
-
-    listOf(topPiece, bottomPiece).forEach { piece ->
-        drawPath(piece, brush = chrome, style = Fill, alpha = alpha)
-        drawPath(piece, neon.copy(alpha = alpha * (0.5f + glitch * 0.5f)), style = Stroke(strokeGlow))
-    }
-}
-
-private fun DrawScope.drawBrandLabel(cx: Float, cy: Float, outerR: Float, alpha: Float, glitch: Float, seed: Float) {
-    val textSizePx = outerR * 0.32f
-    val baseY = cy + outerR * 1.7f
-    val rng = Random(seed.toInt() * 53 + 7)
-    val jitter = if (glitch > 0.2f) (rng.nextFloat() - 0.5f) * glitch * outerR * 0.06f else 0f
-
-    drawContext.canvas.nativeCanvas.apply {
-        val paint = android.graphics.Paint().apply {
-            isAntiAlias = true
-            textSize = textSizePx
-            textAlign = android.graphics.Paint.Align.CENTER
-            letterSpacing = 0.18f
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
-        }
-
-        if (glitch > 0.15f) {
-            paint.color = android.graphics.Color.argb((alpha * glitch * 140).toInt().coerceIn(0, 255), 255, 0, 0)
-            drawText("O B R I S", cx + jitter * 1.5f, baseY, paint)
-            paint.color = android.graphics.Color.argb((alpha * glitch * 120).toInt().coerceIn(0, 255), 0, 255, 255)
-            drawText("O B R I S", cx - jitter * 1.5f, baseY, paint)
-        }
-
-        paint.color = android.graphics.Color.argb((alpha * 255).toInt().coerceIn(0, 255), 255, 140, 0)
-        drawText("O B R I S", cx + jitter, baseY, paint)
-    }
-}
-
-private fun DrawScope.drawScanlines(w: Float, h: Float, alpha: Float) {
-    if (alpha <= 0f) return
-    var y = 0f
-    while (y < h) {
-        drawLine(Color.White.copy(alpha = alpha), Offset(0f, y), Offset(w, y), 1f)
-        y += 4f
-    }
-}
-
-private fun DrawScope.drawVignette(cx: Float, cy: Float, w: Float, h: Float) {
-    drawRect(
-        Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)), Offset(cx, cy), max(w, h) * 0.75f),
-        size = Size(w, h),
-    )
-}
-
-private fun DrawScope.drawDigitalNoise(w: Float, h: Float, glitch: Float, seed: Float) {
-    val rng = Random(seed.toInt() * 71 + 3)
-    repeat((glitch * 90).toInt()) {
-        drawRect(
-            Color.White.copy(alpha = rng.nextFloat() * 0.2f * glitch),
-            Offset(rng.nextFloat() * w, rng.nextFloat() * h),
-            Size(rng.nextFloat() * 2.5f + 0.5f, 1.5f),
-        )
-    }
 }

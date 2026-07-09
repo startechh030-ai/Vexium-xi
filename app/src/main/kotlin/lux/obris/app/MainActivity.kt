@@ -11,7 +11,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -23,30 +22,28 @@ import lux.obris.app.core.theme.ObrisTheme
 import lux.obris.app.feature.settings.presentation.SettingsViewModel
 import javax.inject.Inject
 
+/**
+ * Main entry — landscape, full immersive, no system bars.
+ * No SplashScreen API — we handle our own splash in Compose.
+ */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModels()
-
     @Inject lateinit var composeAuth: ComposeAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         goFullScreen()
-        try {
-            installSplashScreen()
-            super.onCreate(savedInstanceState)
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            enableEdgeToEdge()
-            immersive()
+        super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        enableEdgeToEdge()
+        immersive()
 
-            setContent {
-                val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
-                ObrisTheme(themeMode = themeMode) {
-                    ObrisNavHost(settingsViewModel = settingsViewModel, composeAuth = composeAuth)
-                }
+        setContent {
+            val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+            ObrisTheme(themeMode = themeMode) {
+                ObrisNavHost(settingsViewModel = settingsViewModel, composeAuth = composeAuth)
             }
-        } catch (e: Exception) {
-            Log.e("Obris", "CRASH: ${e.message}", e)
         }
     }
 
@@ -69,7 +66,6 @@ class MainActivity : AppCompatActivity() {
             it.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
             it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        // Fallback for older Android
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             window.decorView.systemUiVisibility =
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or

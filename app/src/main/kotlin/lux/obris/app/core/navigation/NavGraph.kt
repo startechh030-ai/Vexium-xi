@@ -99,6 +99,7 @@ fun ObrisNavHost(
 
             composable<Screen.LoadingFirst> {
                 LoadingScreen(
+                    backgroundImage = "loading_bg_1.jpg",
                     statusMessages = listOf("Initializing...", "Loading assets...", "Connecting to server...", "Preparing environment..."),
                     durationMs = 3000L,
                     onLoadingComplete = {
@@ -122,6 +123,7 @@ fun ObrisNavHost(
 
             composable<Screen.LoadingFinal> {
                 LoadingScreen(
+                    backgroundImage = "loading_bg_2.jpg",
                     statusMessages = listOf("Preparing the world...", "Loading game data...", "Almost ready..."),
                     durationMs = 2500L,
                     onLoadingComplete = {

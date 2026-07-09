@@ -37,12 +37,14 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.delay
 
 /**
- * Loading screen — background image fills every pixel.
- * Uses ContentScale.Crop to ensure edge-to-edge coverage.
- * Bottom gradient overlay for text readability.
+ * Loading screen — background from assets/screens/, fills every pixel.
+ * Progress bar + status text at bottom.
+ *
+ * @param backgroundImage filename in assets/screens/ (e.g. "loading_bg_1.jpg")
  */
 @Composable
 fun LoadingScreen(
+    backgroundImage: String = "loading_bg_1.jpg",
     statusMessages: List<String> = listOf("Loading..."),
     durationMs: Long = 3000L,
     onLoadingComplete: () -> Unit,
@@ -52,7 +54,7 @@ fun LoadingScreen(
 
     val bgPainter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(LocalContext.current)
-            .data("file:///android_asset/vest_screen.png")
+            .data("file:///android_asset/screens/$backgroundImage")
             .build(),
     )
 
@@ -65,7 +67,7 @@ fun LoadingScreen(
         }
     }
 
-    // Progress
+    // Progress bar
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMs.toInt(), easing = LinearEasing))
         delay(150)
@@ -73,7 +75,7 @@ fun LoadingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── Background image — Crop fills every pixel, no bars ever ──
+        // Background — fills every pixel
         Image(
             painter = bgPainter,
             contentDescription = null,
@@ -81,7 +83,7 @@ fun LoadingScreen(
             contentScale = ContentScale.Crop,
         )
 
-        // ── Bottom gradient for readability ──
+        // Bottom gradient overlay
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRect(
                 brush = Brush.verticalGradient(
@@ -93,7 +95,7 @@ fun LoadingScreen(
             )
         }
 
-        // ── Bottom UI ──
+        // Bottom UI
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -116,10 +118,18 @@ fun LoadingScreen(
             // Progress bar
             Box(modifier = Modifier.fillMaxWidth(0.4f).height(3.dp)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRoundRect(Color.White.copy(alpha = 0.15f), size = Size(size.width, size.height), cornerRadius = CornerRadius(2f))
+                    drawRoundRect(
+                        Color.White.copy(alpha = 0.15f),
+                        size = Size(size.width, size.height),
+                        cornerRadius = CornerRadius(2f),
+                    )
                     val fw = size.width * progress.value
                     if (fw > 0f) {
-                        drawRoundRect(Color.White.copy(alpha = 0.9f), size = Size(fw, size.height), cornerRadius = CornerRadius(2f))
+                        drawRoundRect(
+                            Color.White.copy(alpha = 0.9f),
+                            size = Size(fw, size.height),
+                            cornerRadius = CornerRadius(2f),
+                        )
                     }
                 }
             }

@@ -51,7 +51,7 @@ fun WelcomeScreen(
 ) {
     val bgPainter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(LocalContext.current)
-            .data("file:///android_asset/vest_screen.png")
+            .data("file:///android_asset/screens/loading_bg_1.jpg")
             .build(),
     )
 
