@@ -4,15 +4,14 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateInt
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,9 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -31,19 +28,16 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.delay
 import java.io.IOException
 import kotlin.random.Random
 
 /**
- * Splash screen — loads obris.png from assets/splash/,
- * plays glitch.mp3 sound, applies cyberpunk glitch animation.
- * Pure black background. 2.5 seconds total.
- *
- * Flow: Tap app → black → logo appears with glitch → done
+ * Splash screen — obris.png on black with cyberpunk glitch + sound.
+ * 2.5 seconds total.
  */
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
@@ -53,129 +47,126 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
 
     // Load assets + play sound
     LaunchedEffect(Unit) {
-        // Load logo from assets/splash/obris.png
         try {
             context.assets.open("splash/obris.png").use { stream ->
                 logoBitmap = BitmapFactory.decodeStream(stream)?.asImageBitmap()
             }
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
+        } catch (e: IOException) { e.printStackTrace() }
 
-        // Play glitch sound from res/raw/glitch.mp3
         try {
             mediaPlayer = MediaPlayer.create(context, lux.obris.app.R.raw.glitch)?.apply {
                 setOnCompletionListener { it.release() }
                 start()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (_: Exception) {}
 
-        // Total splash duration: 2.5 seconds
         delay(2500)
 
-        // Cleanup and navigate
-        mediaPlayer?.let {
-            try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {}
-        }
+        mediaPlayer?.let { try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {} }
         onSplashFinished()
     }
 
-    // Release on dispose (safety)
     DisposableEffect(Unit) {
         onDispose {
-            mediaPlayer?.let {
-                try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {}
-            }
+            mediaPlayer?.let { try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {} }
         }
     }
 
-    // UI
+    // Glitch animation driver
+    val infiniteTransition = rememberInfiniteTransition(label = "Glitch")
+    val glitchTick by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "GlitchTick",
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF000000)), // Pure black
-        contentAlignment = Alignment.Center,
+            .background(Color.Black),
     ) {
         logoBitmap?.let { bitmap ->
-            Image(
-                bitmap = bitmap,
-                contentDescription = "Obris Logo",
-                modifier = Modifier
-                    .size(240.dp)
-                    .cyberpunkGlitch(enabled = true),
-            )
+            GlitchLogo(bitmap = bitmap, glitchTick = glitchTick)
         }
     }
 }
 
 /**
- * Cyberpunk glitch modifier — slices the image horizontally,
- * shifts slices randomly, overlays chromatic color artifacts.
+ * Draws the logo bitmap with cyberpunk glitch effect.
+ * Slices the image horizontally, shifts slices, adds chromatic color artifacts.
  */
 @Composable
-fun Modifier.cyberpunkGlitch(
-    enabled: Boolean = true,
+private fun GlitchLogo(
+    bitmap: ImageBitmap,
+    glitchTick: Float,
     slices: Int = 16,
-    glitchColors: List<Color> = listOf(Color(0xFF00FFFF), Color(0xFFFF0055), Color(0xFFFFFFFF)),
-): Modifier {
-    if (!enabled) return this
+) {
+    val glitchColors = listOf(Color(0xFF00FFFF), Color(0xFFFF0055), Color(0xFFFFFFFF))
+    val glitchStep = glitchTick.toInt()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "Glitch")
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val canvasW = size.width
+        val canvasH = size.height
 
-    // Tick that drives the glitch timing
-    val glitchStep by infiniteTransition.animateInt(
-        initialValue = 0,
-        targetValue = 10,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "GlitchStep",
-    )
+        // Center the logo — scale to ~35% of screen height
+        val targetH = canvasH * 0.35f
+        val scale = targetH / bitmap.height.toFloat()
+        val drawW = (bitmap.width * scale).toInt()
+        val drawH = (bitmap.height * scale).toInt()
+        val offsetX = ((canvasW - drawW) / 2f).toInt()
+        val offsetY = ((canvasH - drawH) / 2f).toInt()
 
-    return this
-        .graphicsLayer { clip = true }
-        .drawWithContent {
-            // Only glitch during certain frames (2-6 out of 0-10)
-            val isGlitchActive = glitchStep in 2..6
-            val intensity = if (isGlitchActive) (glitchStep / 10f) else 0f
+        val isGlitchActive = glitchStep in 2..6
+        val intensity = if (isGlitchActive) (glitchStep / 10f) else 0f
 
-            if (!isGlitchActive) {
-                // Clean frame — just draw normally
-                drawContent()
-            } else {
-                // Glitch frame — slice and shift
-                val sliceHeight = size.height / slices
+        if (!isGlitchActive) {
+            // Clean frame
+            drawImage(
+                image = bitmap,
+                dstOffset = IntOffset(offsetX, offsetY),
+                dstSize = IntSize(drawW, drawH),
+            )
+        } else {
+            // Glitch frame — slice and shift
+            val sliceH = drawH.toFloat() / slices
 
-                for (i in 0 until slices) {
-                    // Random horizontal shift per slice
-                    val horizontalShift = if (Random.nextInt(4) < glitchStep) {
-                        Random.nextInt(-45, 46).toFloat() * intensity
-                    } else 0f
+            for (i in 0 until slices) {
+                val shiftX = if (Random.nextInt(4) < glitchStep) {
+                    Random.nextInt(-45, 46).toFloat() * intensity
+                } else 0f
 
-                    // Random chance of color overlay
-                    val applyColor = Random.nextInt(100) < 20
+                val applyColor = Random.nextInt(100) < 20
+                val sliceTop = offsetY + i * sliceH
+                val sliceBottom = offsetY + (i + 1) * sliceH
 
-                    clipRect(
-                        top = i * sliceHeight,
-                        bottom = (i + 1) * sliceHeight,
-                    ) {
-                        translate(left = horizontalShift) {
-                            drawContent()
+                clipRect(
+                    left = 0f,
+                    top = sliceTop,
+                    right = canvasW,
+                    bottom = sliceBottom,
+                ) {
+                    translate(left = shiftX) {
+                        drawImage(
+                            image = bitmap,
+                            dstOffset = IntOffset(offsetX, offsetY),
+                            dstSize = IntSize(drawW, drawH),
+                        )
+                    }
 
-                            if (applyColor) {
-                                drawRect(
-                                    color = glitchColors[Random.nextInt(glitchColors.size)],
-                                    topLeft = Offset(0f, i * sliceHeight),
-                                    size = Size(size.width, sliceHeight),
-                                    blendMode = BlendMode.SrcAtop,
-                                )
-                            }
-                        }
+                    if (applyColor) {
+                        drawRect(
+                            color = glitchColors[Random.nextInt(glitchColors.size)],
+                            topLeft = Offset(offsetX.toFloat() + shiftX, sliceTop),
+                            size = Size(drawW.toFloat(), sliceH),
+                            blendMode = BlendMode.SrcAtop,
+                        )
                     }
                 }
             }
         }
+    }
 }
