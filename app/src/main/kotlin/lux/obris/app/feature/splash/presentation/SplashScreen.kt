@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -44,8 +46,9 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     val context = LocalContext.current
     var logoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    val fadeOut = remember { Animatable(1f) }
 
-    // Load assets + play sound
+    // Load assets + play sound + animate
     LaunchedEffect(Unit) {
         try {
             context.assets.open("splash/obris.png").use { stream ->
@@ -60,7 +63,11 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             }
         } catch (_: Exception) {}
 
-        delay(2500)
+        // Total splash: 2 seconds to match sound
+        delay(1600)
+
+        // Smooth fade out before navigating
+        fadeOut.animateTo(0f, tween(400))
 
         mediaPlayer?.let { try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {} }
         onSplashFinished()
@@ -72,14 +79,14 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
         }
     }
 
-    // Glitch animation driver
+    // Glitch animation — 1s forward burst, 1s reverse settle
     val infiniteTransition = rememberInfiniteTransition(label = "Glitch")
     val glitchTick by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 10f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse, // Forward then reverse = matches sound
         ),
         label = "GlitchTick",
     )
@@ -90,7 +97,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             .background(Color.Black),
     ) {
         logoBitmap?.let { bitmap ->
-            GlitchLogo(bitmap = bitmap, glitchTick = glitchTick)
+            GlitchLogo(bitmap = bitmap, glitchTick = glitchTick, alpha = fadeOut.value)
         }
     }
 }
@@ -103,12 +110,13 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
 private fun GlitchLogo(
     bitmap: ImageBitmap,
     glitchTick: Float,
+    alpha: Float = 1f,
     slices: Int = 16,
 ) {
     val glitchColors = listOf(Color(0xFF00FFFF), Color(0xFFFF0055), Color(0xFFFFFFFF))
     val glitchStep = glitchTick.toInt()
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    Canvas(modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha }) {
         val canvasW = size.width
         val canvasH = size.height
 
