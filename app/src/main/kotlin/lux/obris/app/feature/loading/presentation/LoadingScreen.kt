@@ -2,17 +2,21 @@ package lux.obris.app.feature.loading.presentation
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,12 +27,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,10 +43,10 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.delay
 
 /**
- * Loading screen — background from assets/screens/, fills every pixel.
- * Progress bar + status text at bottom.
- *
- * @param backgroundImage filename in assets/screens/ (e.g. "loading_bg_1.jpg")
+ * Loading screen — background fills edge to edge.
+ * Progress bar at bottom-left, small (40% width).
+ * Status text right-aligned at bar start with scan line animation.
+ * Percentage at bar end.
  */
 @Composable
 fun LoadingScreen(
@@ -51,6 +57,14 @@ fun LoadingScreen(
 ) {
     val progress = remember { Animatable(0f) }
     var currentMessage by remember { mutableStateOf(statusMessages.first()) }
+
+    // Scan line animation — moves left to right across the text
+    val inf = rememberInfiniteTransition(label = "scan")
+    val scanPos by inf.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Restart),
+        label = "scanLine",
+    )
 
     val bgPainter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(LocalContext.current)
@@ -67,7 +81,7 @@ fun LoadingScreen(
         }
     }
 
-    // Progress bar
+    // Progress
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMs.toInt(), easing = LinearEasing))
         delay(150)
@@ -75,7 +89,7 @@ fun LoadingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background — fills every pixel
+        // Background
         Image(
             painter = bgPainter,
             contentDescription = null,
@@ -83,63 +97,99 @@ fun LoadingScreen(
             contentScale = ContentScale.Crop,
         )
 
-        // Bottom gradient overlay
+        // Bottom gradient
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRect(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                    startY = size.height * 0.5f,
+                    colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                    startY = size.height * 0.55f,
                     endY = size.height,
                 ),
                 size = Size(size.width, size.height),
             )
         }
 
-        // Bottom UI
-        Column(
+        // ── Bottom loading UI — positioned at very bottom ──
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 24.dp, start = 40.dp, end = 40.dp),
-            verticalArrangement = Arrangement.Bottom,
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(start = 28.dp, end = 28.dp, bottom = 14.dp),
+            contentAlignment = Alignment.BottomStart,
         ) {
-            Text(
-                text = currentMessage.uppercase(),
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.85f),
-                    letterSpacing = 2.sp,
-                ),
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Progress bar
-            Box(modifier = Modifier.fillMaxWidth(0.4f).height(3.dp)) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRoundRect(
-                        Color.White.copy(alpha = 0.15f),
-                        size = Size(size.width, size.height),
-                        cornerRadius = CornerRadius(2f),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // Status text with scan line + transparent border
+                Box(contentAlignment = Alignment.CenterStart) {
+                    // Text with monospace feel
+                    Text(
+                        text = currentMessage.uppercase(),
+                        style = TextStyle(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.7f),
+                            letterSpacing = 1.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                        ),
                     )
-                    val fw = size.width * progress.value
-                    if (fw > 0f) {
-                        drawRoundRect(
-                            Color.White.copy(alpha = 0.9f),
-                            size = Size(fw, size.height),
-                            cornerRadius = CornerRadius(2f),
+
+                    // Scan line overlay — thin vertical line sweeps across text
+                    Canvas(modifier = Modifier.width(150.dp).height(14.dp)) {
+                        val lineX = size.width * scanPos
+                        // Transparent border edges
+                        drawRect(
+                            color = Color.White.copy(alpha = 0.04f),
+                            topLeft = Offset.Zero,
+                            size = Size(size.width, size.height),
+                        )
+                        // Scan line
+                        drawLine(
+                            color = Color(0xFF7DD3FC).copy(alpha = 0.6f),
+                            start = Offset(lineX, 0f),
+                            end = Offset(lineX, size.height),
+                            strokeWidth = 1.5f,
+                        )
+                        // Glow around scan line
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, Color(0xFF7DD3FC).copy(alpha = 0.08f), Color.Transparent),
+                                startX = (lineX - 15f).coerceAtLeast(0f),
+                                endX = (lineX + 15f).coerceAtMost(size.width),
+                            ),
+                            size = Size(size.width, size.height),
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Progress bar — 40% width
+                Box(modifier = Modifier.weight(0.4f).height(3.dp)) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRoundRect(Color.White.copy(alpha = 0.10f), size = Size(size.width, size.height), cornerRadius = CornerRadius(2f))
+                        val fw = size.width * progress.value
+                        if (fw > 0f) {
+                            drawRoundRect(
+                                brush = Brush.horizontalGradient(listOf(Color(0xFF7DD3FC), Color.White)),
+                                size = Size(fw, size.height),
+                                cornerRadius = CornerRadius(2f),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Percentage
+                Text(
+                    text = "${(progress.value * 100).toInt()}%",
+                    style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace),
+                )
+
+                // Fill remaining space
+                Spacer(modifier = Modifier.weight(0.6f))
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "${(progress.value * 100).toInt()}%",
-                style = TextStyle(fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f)),
-            )
         }
     }
 }

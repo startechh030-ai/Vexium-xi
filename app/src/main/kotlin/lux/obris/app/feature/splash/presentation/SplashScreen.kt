@@ -53,26 +53,25 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     val fadeOut = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        // Start BOTH sound and image loading at the same time
-        // Sound first — it's the timing reference
-        launch {
+        // Pre-create MediaPlayer IMMEDIATELY — no coroutine overhead
+        val player = try {
+            MediaPlayer.create(context, lux.obris.app.R.raw.glitch)
+        } catch (_: Exception) { null }
+        mediaPlayer = player
+
+        // Load logo on IO thread (fast — local asset)
+        launch(Dispatchers.IO) {
             try {
-                mediaPlayer = MediaPlayer.create(context, lux.obris.app.R.raw.glitch)?.apply {
-                    setOnCompletionListener { it.release() }
-                    start() // Sound starts IMMEDIATELY
+                context.assets.open("splash/obris.png").use { stream ->
+                    logoBitmap = BitmapFactory.decodeStream(stream)?.asImageBitmap()
                 }
             } catch (_: Exception) {}
         }
 
-        // Load logo in parallel (should be fast — it's a local asset)
-        launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    context.assets.open("splash/obris.png").use { stream ->
-                        logoBitmap = BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                    }
-                }
-            } catch (_: Exception) {}
+        // Start sound NOW — no delay
+        player?.apply {
+            setOnCompletionListener { it.release() }
+            start()
         }
 
         // Wait for the sound duration (2 seconds)
