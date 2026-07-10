@@ -3,7 +3,6 @@ package lux.obris.app
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -11,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -22,10 +22,6 @@ import lux.obris.app.core.theme.ObrisTheme
 import lux.obris.app.feature.settings.presentation.SettingsViewModel
 import javax.inject.Inject
 
-/**
- * Main entry — landscape, full immersive, no system bars.
- * No SplashScreen API — we handle our own splash in Compose.
- */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
@@ -33,6 +29,10 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var composeAuth: ComposeAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Override Android 12+ splash — shows black, no icon, exits immediately
+        val splash = installSplashScreen()
+        splash.setKeepOnScreenCondition { false } // Don't keep — exit instantly
+
         goFullScreen()
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE

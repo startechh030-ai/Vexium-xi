@@ -131,8 +131,8 @@ dependencies {
     // ── Lottie Animations ──
     implementation(libs.lottie.compose)
 
-    // ── Splash Screen (no longer using SplashScreen API — custom Compose splash) ──
-    // implementation(libs.androidx.splashscreen)
+    // ── Splash Screen API (to override Android 12+ default icon splash) ──
+    implementation(libs.androidx.splashscreen)
 
 
 
