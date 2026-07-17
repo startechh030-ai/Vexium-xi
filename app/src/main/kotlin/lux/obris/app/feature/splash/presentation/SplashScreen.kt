@@ -12,11 +12,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,30 +40,39 @@ import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 /**
- * Splash — obris.png + glitch.mp3 start at the SAME time.
- * Sound and visual are perfectly synced.
- * 2 seconds: 1s forward glitch, 1s reverse settle.
- * Then 400ms fade out → navigate.
+ * Splash screen — 3 phases:
+ *   Phase 0: Logo + glitch + sound (2s, synced)
+ *   Phase 1: Curtain reveal transition (0.6s)
+ *   Phase 2: Navigate
+ *
+ * Sound: 50% volume, distant echo feel.
+ * Curtain: screen splits from center, left half slides left, right slides right.
  */
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
     val context = LocalContext.current
     var logoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-    val fadeOut = remember { Animatable(1f) }
+    var phase by remember { mutableIntStateOf(0) } // 0=glitch, 1=curtain, 2=done
+
+    // Curtain animation: 0 = closed (full screen), 1 = open (halves off screen)
+    val curtainProgress = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Pre-create MediaPlayer IMMEDIATELY — no coroutine overhead
+        // Create MediaPlayer FIRST — synchronous, no coroutine delay
         val player = try {
-            MediaPlayer.create(context, lux.obris.app.R.raw.glitch)
+            MediaPlayer.create(context, lux.obris.app.R.raw.glitch)?.apply {
+                // 50% volume, distant feel (left=0.5, right=0.5)
+                setVolume(0.5f, 0.5f)
+                setOnCompletionListener { it.release() }
+            }
         } catch (_: Exception) { null }
         mediaPlayer = player
 
-        // Load logo on IO thread (fast — local asset)
+        // Load logo on IO thread in parallel
         launch(Dispatchers.IO) {
             try {
                 context.assets.open("splash/obris.png").use { stream ->
@@ -68,19 +81,20 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             } catch (_: Exception) {}
         }
 
-        // Start sound NOW — no delay
-        player?.apply {
-            setOnCompletionListener { it.release() }
-            start()
-        }
+        // Start sound NOW — same frame as visual
+        player?.start()
 
-        // Wait for the sound duration (2 seconds)
-        delay(1600)
+        // Wait for sound to finish (2 seconds)
+        // Use the actual sound duration if available, else default 2s
+        val soundDuration = player?.duration?.toLong() ?: 2000L
+        delay(soundDuration)
 
-        // Fade out
-        fadeOut.animateTo(0f, tween(400))
+        // Phase 1: Curtain reveal
+        phase = 1
+        curtainProgress.animateTo(1f, tween(600, easing = LinearEasing))
 
-        // Cleanup
+        // Phase 2: Navigate
+        phase = 2
         mediaPlayer?.let { try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {} }
         onSplashFinished()
     }
@@ -91,7 +105,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
         }
     }
 
-    // Glitch animation — 1s forward, 1s reverse (matches sound)
+    // Glitch animation — 1s forward, 1s reverse
     val infiniteTransition = rememberInfiniteTransition(label = "Glitch")
     val glitchTick by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -108,13 +122,56 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        logoBitmap?.let { bitmap ->
-            GlitchLogo(bitmap = bitmap, glitchTick = glitchTick, alpha = fadeOut.value)
+        when (phase) {
+            // ── Phase 0: Logo with glitch ──
+            0 -> {
+                logoBitmap?.let { bitmap ->
+                    GlitchLogo(bitmap = bitmap, glitchTick = glitchTick, alpha = 1f)
+                }
+            }
+
+            // ── Phase 1: Curtain reveal — splits from center ──
+            1 -> {
+                val progress = curtainProgress.value
+
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Left curtain — slides left
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(0.5f)
+                            .graphicsLayer {
+                                translationX = -size.width * progress
+                            }
+                            .background(Color.Black),
+                    ) {
+                        // Draw the left half of the logo (clipped)
+                        logoBitmap?.let { bitmap ->
+                            GlitchLogo(bitmap = bitmap, glitchTick = 0f, alpha = 1f - progress * 0.5f)
+                        }
+                    }
+
+                    // Right curtain — slides right
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                translationX = size.width * progress
+                            }
+                            .background(Color.Black),
+                    ) {
+                        logoBitmap?.let { bitmap ->
+                            GlitchLogo(bitmap = bitmap, glitchTick = 0f, alpha = 1f - progress * 0.5f)
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-/** Draws the logo with cyberpunk glitch — slices + chromatic artifacts */
+/** Draws the logo bitmap with cyberpunk glitch — slices + chromatic artifacts */
 @Composable
 private fun GlitchLogo(
     bitmap: ImageBitmap,
@@ -129,7 +186,6 @@ private fun GlitchLogo(
         val canvasW = size.width
         val canvasH = size.height
 
-        // Center and scale logo to ~35% of screen height
         val targetH = canvasH * 0.35f
         val scale = targetH / bitmap.height.toFloat()
         val drawW = (bitmap.width * scale).toInt()
@@ -141,12 +197,9 @@ private fun GlitchLogo(
         val intensity = if (isGlitchActive) (glitchStep / 10f) else 0f
 
         if (!isGlitchActive) {
-            // Clean frame
             drawImage(bitmap, dstOffset = IntOffset(offsetX, offsetY), dstSize = IntSize(drawW, drawH))
         } else {
-            // Glitch frame
             val sliceH = drawH.toFloat() / slices
-
             for (i in 0 until slices) {
                 val shiftX = if (Random.nextInt(4) < glitchStep) {
                     Random.nextInt(-45, 46).toFloat() * intensity
@@ -160,7 +213,6 @@ private fun GlitchLogo(
                     translate(left = shiftX) {
                         drawImage(bitmap, dstOffset = IntOffset(offsetX, offsetY), dstSize = IntSize(drawW, drawH))
                     }
-
                     if (applyColor) {
                         drawRect(
                             color = glitchColors[Random.nextInt(glitchColors.size)],
