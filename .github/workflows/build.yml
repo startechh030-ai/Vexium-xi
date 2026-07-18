@@ -42,7 +42,7 @@ jobs:
         with:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
-          retention-days: 14
+          retention-days: 1
 
       - name: 🧪 Run Unit Tests
         run: ./gradlew testDebugUnitTest --continue
@@ -53,7 +53,7 @@ jobs:
         with:
           name: test-reports
           path: app/build/reports/tests/testDebugUnitTest/
-          retention-days: 14
+          retention-days: 1
 
       - name: 🔨 Build Debug APK (release-signed)
         run: ./gradlew assembleDebug
@@ -76,7 +76,7 @@ jobs:
         with:
           name: vexium-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 30
+          retention-days: 1
           if-no-files-found: error
 
       - name: 📦 Upload Release APK
@@ -84,7 +84,7 @@ jobs:
         with:
           name: vexium-release-${{ github.sha }}
           path: app/build/outputs/apk/release/*.apk
-          retention-days: 30
+          retention-days: 1
           if-no-files-found: error
 
       - name: ✅ Build Summary
