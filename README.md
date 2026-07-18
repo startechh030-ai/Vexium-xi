@@ -68,3 +68,4 @@ assets/logo/                      # Obris SVG logo
 
 ## CI/CD
 GitHub Actions: lint → test → debug APK → release APK on push to `main`/`develop`.
+# Vexium-xi
