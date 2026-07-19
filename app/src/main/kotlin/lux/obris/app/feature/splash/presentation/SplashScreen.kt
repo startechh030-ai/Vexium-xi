@@ -12,15 +12,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,36 +39,19 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
- * Splash screen — 3 phases:
- *   Phase 0: Logo + glitch + sound (2s, synced)
- *   Phase 1: Curtain reveal transition (0.6s)
- *   Phase 2: Navigate
- *
- * Sound: 50% volume, distant echo feel.
- * Curtain: screen splits from center, left half slides left, right slides right.
+ * Splash — logo + glitch + distant sound.
+ * Sound starts at 0.4s, 30% volume, distant feel.
+ * Simple fade out at end. No curtain.
  */
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
     val context = LocalContext.current
     var logoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-    var phase by remember { mutableIntStateOf(0) } // 0=glitch, 1=curtain, 2=done
-
-    // Curtain animation: 0 = closed (full screen), 1 = open (halves off screen)
-    val curtainProgress = remember { Animatable(0f) }
+    val fadeOut = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        // Create MediaPlayer FIRST — synchronous, no coroutine delay
-        val player = try {
-            MediaPlayer.create(context, lux.obris.app.R.raw.glitch)?.apply {
-                // 50% volume, distant feel (left=0.5, right=0.5)
-                setVolume(0.5f, 0.5f)
-                setOnCompletionListener { it.release() }
-            }
-        } catch (_: Exception) { null }
-        mediaPlayer = player
-
-        // Load logo on IO thread in parallel
+        // Load logo immediately on IO
         launch(Dispatchers.IO) {
             try {
                 context.assets.open("splash/obris.png").use { stream ->
@@ -81,20 +60,27 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             } catch (_: Exception) {}
         }
 
-        // Start sound NOW — same frame as visual
-        player?.start()
+        // Wait 0.4 seconds before starting sound
+        delay(400)
 
-        // Wait for sound to finish (2 seconds)
-        // Use the actual sound duration if available, else default 2s
-        val soundDuration = player?.duration?.toLong() ?: 2000L
+        // Create and start sound — 30% volume, distant
+        val player = try {
+            MediaPlayer.create(context, lux.obris.app.R.raw.glitch)?.apply {
+                setVolume(0.30f, 0.30f)
+                setOnCompletionListener { it.release() }
+                start()
+            }
+        } catch (_: Exception) { null }
+        mediaPlayer = player
+
+        // Wait for sound to finish
+        val soundDuration = player?.duration?.toLong() ?: 1600L
         delay(soundDuration)
 
-        // Phase 1: Curtain reveal
-        phase = 1
-        curtainProgress.animateTo(1f, tween(600, easing = LinearEasing))
+        // Simple fade out
+        fadeOut.animateTo(0f, tween(350))
 
-        // Phase 2: Navigate
-        phase = 2
+        // Navigate
         mediaPlayer?.let { try { if (it.isPlaying) it.stop(); it.release() } catch (_: Exception) {} }
         onSplashFinished()
     }
@@ -105,121 +91,52 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
         }
     }
 
-    // Glitch animation — 1s forward, 1s reverse
-    val infiniteTransition = rememberInfiniteTransition(label = "Glitch")
-    val glitchTick by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "GlitchTick",
+    // Glitch tick
+    val inf = rememberInfiniteTransition(label = "G")
+    val glitchTick by inf.animateFloat(
+        0f, 10f,
+        infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "t",
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-    ) {
-        when (phase) {
-            // ── Phase 0: Logo with glitch ──
-            0 -> {
-                logoBitmap?.let { bitmap ->
-                    GlitchLogo(bitmap = bitmap, glitchTick = glitchTick, alpha = 1f)
-                }
-            }
-
-            // ── Phase 1: Curtain reveal — splits from center ──
-            1 -> {
-                val progress = curtainProgress.value
-
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Left curtain — slides left
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(0.5f)
-                            .graphicsLayer {
-                                translationX = -size.width * progress
-                            }
-                            .background(Color.Black),
-                    ) {
-                        // Draw the left half of the logo (clipped)
-                        logoBitmap?.let { bitmap ->
-                            GlitchLogo(bitmap = bitmap, glitchTick = 0f, alpha = 1f - progress * 0.5f)
-                        }
-                    }
-
-                    // Right curtain — slides right
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                translationX = size.width * progress
-                            }
-                            .background(Color.Black),
-                    ) {
-                        logoBitmap?.let { bitmap ->
-                            GlitchLogo(bitmap = bitmap, glitchTick = 0f, alpha = 1f - progress * 0.5f)
-                        }
-                    }
-                }
-            }
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        logoBitmap?.let { bitmap ->
+            GlitchLogo(bitmap, glitchTick, fadeOut.value)
         }
     }
 }
 
-/** Draws the logo bitmap with cyberpunk glitch — slices + chromatic artifacts */
 @Composable
-private fun GlitchLogo(
-    bitmap: ImageBitmap,
-    glitchTick: Float,
-    alpha: Float = 1f,
-    slices: Int = 16,
-) {
-    val glitchColors = listOf(Color(0xFF00FFFF), Color(0xFFFF0055), Color(0xFFFFFFFF))
-    val glitchStep = glitchTick.toInt()
+private fun GlitchLogo(bitmap: ImageBitmap, glitchTick: Float, alpha: Float) {
+    val colors = listOf(Color(0xFF00FFFF), Color(0xFFFF0055), Color(0xFFFFFFFF))
+    val step = glitchTick.toInt()
 
-    Canvas(modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha }) {
-        val canvasW = size.width
-        val canvasH = size.height
+    Canvas(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha }) {
+        val w = size.width; val h = size.height
+        val tH = h * 0.35f
+        val sc = tH / bitmap.height
+        val dW = (bitmap.width * sc).toInt()
+        val dH = (bitmap.height * sc).toInt()
+        val oX = ((w - dW) / 2f).toInt()
+        val oY = ((h - dH) / 2f).toInt()
 
-        val targetH = canvasH * 0.35f
-        val scale = targetH / bitmap.height.toFloat()
-        val drawW = (bitmap.width * scale).toInt()
-        val drawH = (bitmap.height * scale).toInt()
-        val offsetX = ((canvasW - drawW) / 2f).toInt()
-        val offsetY = ((canvasH - drawH) / 2f).toInt()
+        val active = step in 2..6
+        val intensity = if (active) step / 10f else 0f
 
-        val isGlitchActive = glitchStep in 2..6
-        val intensity = if (isGlitchActive) (glitchStep / 10f) else 0f
-
-        if (!isGlitchActive) {
-            drawImage(bitmap, dstOffset = IntOffset(offsetX, offsetY), dstSize = IntSize(drawW, drawH))
+        if (!active) {
+            drawImage(bitmap, dstOffset = IntOffset(oX, oY), dstSize = IntSize(dW, dH))
         } else {
-            val sliceH = drawH.toFloat() / slices
-            for (i in 0 until slices) {
-                val shiftX = if (Random.nextInt(4) < glitchStep) {
-                    Random.nextInt(-45, 46).toFloat() * intensity
-                } else 0f
-
-                val applyColor = Random.nextInt(100) < 20
-                val sliceTop = offsetY + i * sliceH
-                val sliceBottom = offsetY + (i + 1) * sliceH
-
-                clipRect(left = 0f, top = sliceTop, right = canvasW, bottom = sliceBottom) {
-                    translate(left = shiftX) {
-                        drawImage(bitmap, dstOffset = IntOffset(offsetX, offsetY), dstSize = IntSize(drawW, drawH))
+            val sliceH = dH / 16f
+            for (i in 0 until 16) {
+                val shift = if (Random.nextInt(4) < step) Random.nextInt(-45, 46) * intensity else 0f
+                val top = oY + i * sliceH
+                val bot = oY + (i + 1) * sliceH
+                clipRect(0f, top, w, bot) {
+                    translate(left = shift) {
+                        drawImage(bitmap, dstOffset = IntOffset(oX, oY), dstSize = IntSize(dW, dH))
                     }
-                    if (applyColor) {
-                        drawRect(
-                            color = glitchColors[Random.nextInt(glitchColors.size)],
-                            topLeft = Offset(offsetX.toFloat() + shiftX, sliceTop),
-                            size = Size(drawW.toFloat(), sliceH),
-                            blendMode = BlendMode.SrcAtop,
-                        )
+                    if (Random.nextInt(100) < 20) {
+                        drawRect(colors[Random.nextInt(3)], Offset(oX + shift, top), Size(dW.toFloat(), sliceH), blendMode = BlendMode.SrcAtop)
                     }
                 }
             }
