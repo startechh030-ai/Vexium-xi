@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.rememberAsyncImagePainter
@@ -19,8 +20,8 @@ import coil3.request.ImageRequest
 import lux.obris.app.feature.auth.presentation.AuthLayout
 
 /**
- * Welcome screen — full bleed background + AuthLayout overlay.
- * AuthLayout is a separate composable for easy editing.
+ * Welcome — full bleed background with compact AuthLayout at bottom.
+ * Auth buttons are small and don't cover the artwork.
  */
 @Composable
 fun WelcomeScreen(
@@ -43,19 +44,26 @@ fun WelcomeScreen(
             contentScale = ContentScale.Crop,
         )
 
-        // Version top-left
+        // Version — top right (like Arena Breakout)
         Text(
-            text = "v1.0.0",
-            style = TextStyle(fontSize = 9.sp, color = Color.White.copy(alpha = 0.3f), letterSpacing = 1.sp),
-            modifier = Modifier.padding(start = 12.dp, top = 8.dp).align(Alignment.TopStart),
+            text = "1.0.0 | Performance: Stable",
+            style = TextStyle(
+                fontSize = 8.sp,
+                color = Color.White.copy(alpha = 0.25f),
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 0.5.sp,
+            ),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 12.dp, top = 8.dp),
         )
 
-        // Auth overlay — bottom 40%
+        // Auth — compact buttons at bottom
         AuthLayout(
             onGoogleClick = onGoogleClick,
             onEmailClick = onEmailClick,
             onGuestClick = onGuestClick,
-            onMoreClick = onEmailClick, // More → email for now
+            onMoreClick = onEmailClick,
         )
     }
 }
